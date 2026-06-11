@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Executive Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased">
+  <main class="mx-auto min-h-screen max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+    <header class="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">AI Clinic CFO Copilot</p>
+        <h1 class="mt-2 text-3xl font-black tracking-tight md:text-5xl">Executive Dashboard</h1>
+        <p id="subtitle" class="mt-2 text-sm text-slate-400">Loading business snapshot...</p>
+      </div>
+      <nav class="flex flex-wrap gap-2 text-sm">
+        <a class="rounded-full bg-white/10 px-4 py-2 font-bold hover:bg-white/20" href="?view=dashboard">Overview</a>
+        <a class="rounded-full bg-white/10 px-4 py-2 font-bold hover:bg-white/20" href="?view=finance">Finance</a>
+        <a class="rounded-full bg-white/10 px-4 py-2 font-bold hover:bg-white/20" href="?view=bpjs">BPJS</a>
+        <a class="rounded-full bg-white/10 px-4 py-2 font-bold hover:bg-white/20" href="?view=pharmacy">Pharmacy</a>
+        <button id="refreshBtn" onclick="loadDashboard()" class="rounded-full bg-cyan-400 px-4 py-2 font-black text-slate-950 hover:bg-cyan-300">Refresh</button>
+      </nav>
+    </header>
+
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <article class="rounded-3xl bg-gradient-to-br from-cyan-400 to-blue-600 p-5 text-slate-950 shadow-xl shadow-cyan-950/30 xl:col-span-1">
+        <p class="text-sm font-black uppercase opacity-70">Revenue</p>
+        <p id="revenue" class="mt-3 text-3xl font-black tracking-tight">-</p>
+        <p id="revenueHint" class="mt-2 text-sm font-semibold opacity-80">Total revenue</p>
+      </article>
+      <article class="rounded-3xl bg-gradient-to-br from-emerald-400 to-teal-600 p-5 text-slate-950 shadow-xl shadow-emerald-950/30 xl:col-span-1">
+        <p class="text-sm font-black uppercase opacity-70">Profit</p>
+        <p id="profit" class="mt-3 text-3xl font-black tracking-tight">-</p>
+        <p id="profitHint" class="mt-2 text-sm font-semibold opacity-80">Net Profit</p>
+      </article>
+      <article class="rounded-3xl bg-white/10 p-5 shadow-xl shadow-black/20 ring-1 ring-white/10">
+        <p class="text-sm font-black uppercase text-slate-400">BPJS Receivable</p>
+        <p id="bpjsReceivable" class="mt-3 text-3xl font-black tracking-tight">-</p>
+        <p id="bpjsHint" class="mt-2 text-sm text-slate-400">Outstanding klaim</p>
+      </article>
+      <article class="rounded-3xl bg-white/10 p-5 shadow-xl shadow-black/20 ring-1 ring-white/10">
+        <p class="text-sm font-black uppercase text-slate-400">Inventory Risk</p>
+        <p id="inventoryRisk" class="mt-3 text-3xl font-black tracking-tight">-</p>
+        <p id="inventoryHint" class="mt-2 text-sm text-slate-400">Risk score</p>
+      </article>
+      <article class="rounded-3xl bg-white/10 p-5 shadow-xl shadow-black/20 ring-1 ring-white/10">
+        <p class="text-sm font-black uppercase text-slate-400">Growth Trend</p>
+        <p id="growth" class="mt-3 text-3xl font-black tracking-tight">-</p>
+        <p id="growthHint" class="mt-2 text-sm text-slate-400">Revenue growth</p>
+      </article>
+    </section>
+
+    <section class="mt-5 grid gap-5 lg:grid-cols-3">
+      <article class="rounded-3xl bg-white/10 p-5 ring-1 ring-white/10 lg:col-span-2">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <div><h2 class="text-xl font-black">Growth Trend</h2><p class="text-sm text-slate-400">Revenue dan Profit per period</p></div>
+          <span id="statusBadge" class="rounded-full bg-slate-800 px-3 py-1 text-xs font-bold text-slate-300">-</span>
+        </div>
+        <canvas id="growthChart" height="130"></canvas>
+      </article>
+      <article class="rounded-3xl bg-white/10 p-5 ring-1 ring-white/10">
+        <h2 class="text-xl font-black">Executive Notes</h2>
+        <div id="notes" class="mt-4 space-y-3 text-sm text-slate-300"></div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    let growthChart;
+    function rupiah(value){const n=Number(value||0),abs=Math.abs(n),sign=n<0?'-':'';if(abs>=1e9)return sign+'Rp'+(abs/1e9).toFixed(1).replace('.0','')+' M';if(abs>=1e6)return sign+'Rp'+(abs/1e6).toFixed(1).replace('.0','')+' jt';return sign+'Rp'+abs.toLocaleString('id-ID')}
+    function pct(value){if(value===null||value===undefined||value==='')return '-';return (Number(value)*100).toFixed(1).replace('.0','')+'%'}
+    function setText(id,text){document.getElementById(id).textContent=text}
+    function loadDashboard(){const btn=document.getElementById('refreshBtn');btn.disabled=true;btn.textContent='Loading...';google.script.run.withSuccessHandler(renderDashboard).withFailureHandler(function(err){btn.disabled=false;btn.textContent='Refresh';alert(err.message||err)}).getDefaultExecutiveDashboardPayload()}
+    function renderDashboard(payload){document.getElementById('refreshBtn').disabled=false;document.getElementById('refreshBtn').textContent='Refresh';setText('subtitle',payload.clinicId+' • Period '+payload.period+' • '+payload.generatedAt);setText('revenue',rupiah(payload.cards.revenue));setText('profit',rupiah(payload.cards.profit));setText('bpjsReceivable',rupiah(payload.cards.bpjsReceivable));setText('inventoryRisk',String(payload.cards.inventoryRisk||0)+'/100');setText('growth',pct(payload.cards.growth));setText('revenueHint','Data: '+payload.finance.dataStatus+' • Trace: '+payload.finance.traceStatus);setText('profitHint','Margin '+pct(payload.finance.profitMargin));setText('bpjsHint',(payload.bpjs.claimCount||0)+' claim rows • paid '+rupiah(payload.bpjs.paidAmount));setText('inventoryHint',(payload.pharmacy.riskLevel||'unknown').toUpperCase()+' • '+(payload.pharmacy.noMovementCount||0)+' no movement');setText('growthHint',(payload.trend||[]).length+' period(s)');setText('statusBadge','Data '+payload.dataStatus+' • Trace '+payload.traceStatus);renderNotes(payload);renderGrowthChart(payload.trend||[])}
+    function renderNotes(payload){const notes=[];notes.push('Revenue '+rupiah(payload.finance.totalRevenue)+' dengan Net Profit '+rupiah(payload.finance.netProfit)+'.');notes.push('BPJS Receivable '+rupiah(payload.bpjs.outstandingAmount)+' dari '+(payload.bpjs.claimCount||0)+' claim rows.');notes.push('Inventory Risk '+(payload.pharmacy.riskScore||0)+'/100 ('+(payload.pharmacy.riskLevel||'unknown')+').');if(payload.caveat)notes.push(payload.caveat);document.getElementById('notes').innerHTML=notes.map(n=>'<div class="rounded-2xl bg-slate-900/80 p-4 ring-1 ring-white/10">'+n+'</div>').join('')}
+    function renderGrowthChart(rows){const ctx=document.getElementById('growthChart');if(growthChart)growthChart.destroy();growthChart=new Chart(ctx,{type:'line',data:{labels:rows.map(r=>r.period),datasets:[{label:'Revenue',data:rows.map(r=>r.totalRevenue),borderColor:'#22d3ee',backgroundColor:'rgba(34,211,238,.12)',tension:.35,fill:true},{label:'Profit',data:rows.map(r=>r.netProfit),borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.10)',tension:.35,fill:true}]},options:{responsive:true,plugins:{legend:{labels:{color:'#cbd5e1'}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(148,163,184,.12)'}},y:{ticks:{color:'#94a3b8',callback:v=>rupiah(v)},grid:{color:'rgba(148,163,184,.12)'}}}}})}
+    window.onload=loadDashboard;
+  </script>
+</body>
+</html>

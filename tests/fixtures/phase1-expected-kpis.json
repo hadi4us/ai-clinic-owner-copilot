@@ -1,0 +1,17 @@
+{
+  "fixture": "phase1-sample-data",
+  "tenant_id": "klinik_001",
+  "clinic_id": "clinic_001",
+  "period_start": "2026-06-01",
+  "period_end": "2026-06-03",
+  "expected": {
+    "total_visits": 5,
+    "total_revenue": 1950000,
+    "direct_cost": 660000,
+    "operating_expense": 1750000,
+    "gross_profit": 1290000,
+    "net_profit": -460000,
+    "profit_margin_rounded_4dp": -0.2359,
+    "data_status": "complete"
+  }
+}
