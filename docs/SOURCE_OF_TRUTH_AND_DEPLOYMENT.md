@@ -71,33 +71,17 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
 
 ## Current pilot deployment
 
-- Apps Script version: `12`
-- Deployment ID: `AKfycbxtZ6oiag4LoZWgUOss4G8VWdol8W_i88gJKQN-abz4RJgmEXRQKBetXlnA-IoL24U`
-- Web app URL: `https://script.google.com/macros/s/AKfycbxtZ6oiag4LoZWgUOss4G8VWdol8W_i88gJKQN-abz4RJgmEXRQKBetXlnA-IoL24U/exec`
-- Description: `Pilot readiness hardening v12`
-- Public unauthenticated fetch redirects to Google sign-in, confirming the app is not anonymous.
-- `clasp run runAllTests` is currently blocked by Apps Script API permission, so use the web readiness route after signing in: `?action=readiness`.
+No active production/pilot deployment is currently approved for ai-clinic.
 
-## Known access issue: pilot URL shows "Anda memerlukan akses"
+The previous versioned deployment under `ccc19depok@gmail.com` was undeployed and must not be used. The next deployment must be created from a `hadi4us@gmail.com`-owned Apps Script project and documented here with its version, deployment ID, web app URL, and readiness result.
 
-If a signed-in pilot user (for example `hadi4us@gmail.com`) sees Google Drive "Anda memerlukan akses" when opening the web app URL, the Apps Script project/deployment is not shared or accessible to that Google account yet.
+Before any Google-side action for ai-clinic, run:
 
-Current clasp account/deployer observed by CLI: `ccc19depok@gmail.com`.
+```bash
+scripts/check-google-account.sh
+```
 
-Fix from the owner/deployer Google account:
-
-1. Open the Apps Script project:
-   `https://script.google.com/d/1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy/edit`
-2. Share the project with `hadi4us@gmail.com` at least as Editor while preparing pilot access.
-3. In Project Settings > Script Properties, set:
-   - `PILOT_OWNER_EMAIL=hadi4us@gmail.com`
-   - `PILOT_MUTATION_TOKEN=<strong random token>`
-   - optional: `WAREHOUSE_SPREADSHEET_ID=<pilot spreadsheet id>`
-4. Deploy > Manage deployments > verify the versioned deployment uses access "Anyone with Google account" / manifest `webapp.access: ANYONE`.
-5. Open after sign-in:
-   `https://script.google.com/macros/s/AKfycbxtZ6oiag4LoZWgUOss4G8VWdol8W_i88gJKQN-abz4RJgmEXRQKBetXlnA-IoL24U/exec?action=readiness`
-
-Automation note: attempting to grant Drive permission via the current clasp token returned `appNotAuthorizedToFile`, so sharing must be performed once from the owner/deployer Google UI or by re-authorizing clasp with Drive write permission.
+It must report `hadi4us@gmail.com` before `clasp push`, version creation, deployment, Script Properties work, or pilot spreadsheet mutation.
 
 ## Google account policy for ai-clinic
 
@@ -130,6 +114,27 @@ Minimum temporary fix, if the old deployment must be inspected first:
 5. Run setup once, then open the new `hadi4us@gmail.com` deployment URL with `?action=readiness`.
 
 Automation note: attempting to grant Drive permission to `hadi4us@gmail.com` via the old clasp token returned `appNotAuthorizedToFile`, so ownership/sharing must be done once through Google UI or by re-authorizing clasp as `hadi4us@gmail.com`.
+
+## Hadi4us migration checklist
+
+1. Authenticate clasp with the required account:
+   ```bash
+   cd gas
+   npx clasp logout
+   npx clasp login
+   # choose hadi4us@gmail.com
+   ../scripts/check-google-account.sh
+   ```
+2. Create a new Apps Script project from `hadi4us@gmail.com` or clone/copy ownership into a `hadi4us@gmail.com`-owned project.
+3. Update `gas/.clasp.json` and `gas/verify/.clasp.json` with the new script ID.
+4. Ensure the pilot spreadsheet is owned by or shared to `hadi4us@gmail.com`.
+5. Set Script Properties on the new Apps Script project:
+   - `PILOT_OWNER_EMAIL=hadi4us@gmail.com`
+   - `PILOT_MUTATION_TOKEN=<strong random token>`
+   - `WAREHOUSE_SPREADSHEET_ID=<pilot spreadsheet id>` if not using the fallback ID.
+6. Run local/static checks.
+7. Run `clasp push`, create a new version, and deploy from the `hadi4us@gmail.com` account.
+8. Open the new web app URL with `?action=readiness`; status must be `READY_FOR_PILOT_SMOKE` before pilot use.
 
 ## Deprecated ccc19depok deployments
 

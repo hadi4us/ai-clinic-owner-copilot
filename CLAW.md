@@ -4,6 +4,11 @@
 
 Dokumen ini adalah sumber kebenaran utama (Single Source of Truth) untuk seluruh agen OpenClaw yang bekerja pada proyek ini.
 
+## GOOGLE ACCOUNT RULE
+
+Khusus project ai-clinic, seluruh resource Google-side wajib memakai `hadi4us@gmail.com`: Apps Script, clasp/OAuth, Sheets, Script Properties, deployment, dan testing. Jangan memakai `ccc19depok@gmail.com` untuk ai-clinic. Project lain seperti `pd3i` boleh tetap memakai akun yang berbeda sesuai instruksi user.
+
+
 Sebelum membuat, mengubah, atau menghapus kode, seluruh agen WAJIB membaca dan mematuhi dokumen ini.
 
 ---
