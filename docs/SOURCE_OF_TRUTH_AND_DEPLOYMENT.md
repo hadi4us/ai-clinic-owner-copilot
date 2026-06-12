@@ -98,3 +98,35 @@ Fix from the owner/deployer Google account:
    `https://script.google.com/macros/s/AKfycbxtZ6oiag4LoZWgUOss4G8VWdol8W_i88gJKQN-abz4RJgmEXRQKBetXlnA-IoL24U/exec?action=readiness`
 
 Automation note: attempting to grant Drive permission via the current clasp token returned `appNotAuthorizedToFile`, so sharing must be performed once from the owner/deployer Google UI or by re-authorizing clasp with Drive write permission.
+
+## Google account policy for ai-clinic
+
+All Google-side resources for this project must use `hadi4us@gmail.com`:
+
+- Apps Script project ownership/deployments
+- clasp/OAuth credentials
+- Script Properties
+- Pilot spreadsheet ownership/access
+- Web app authorization/testing
+
+Do **not** use `ccc19depok@gmail.com` for ai-clinic deployments or pilot data.
+
+### Migration from old deployment
+
+The current historical Apps Script project/deployment was created with `ccc19depok@gmail.com` and may show Google Drive "Anda memerlukan akses" for `hadi4us@gmail.com`.
+
+Preferred fix: create or clone a fresh Apps Script project while logged in with `hadi4us@gmail.com`, then update `gas/.clasp.json` and `gas/verify/.clasp.json` to the new script ID.
+
+Minimum temporary fix, if the old deployment must be inspected first:
+
+1. From `ccc19depok@gmail.com`, open:
+   `https://script.google.com/d/1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy/edit`
+2. Share it with `hadi4us@gmail.com` as Editor.
+3. From `hadi4us@gmail.com`, make/copy/own the production Apps Script project and redeploy.
+4. Set Script Properties on the `hadi4us@gmail.com`-owned project:
+   - `PILOT_OWNER_EMAIL=hadi4us@gmail.com`
+   - `PILOT_MUTATION_TOKEN=<random strong token>`
+   - optional: `WAREHOUSE_SPREADSHEET_ID=<pilot spreadsheet id owned/shared to hadi4us>`
+5. Run setup once, then open the new `hadi4us@gmail.com` deployment URL with `?action=readiness`.
+
+Automation note: attempting to grant Drive permission to `hadi4us@gmail.com` via the old clasp token returned `appNotAuthorizedToFile`, so ownership/sharing must be done once through Google UI or by re-authorizing clasp as `hadi4us@gmail.com`.
