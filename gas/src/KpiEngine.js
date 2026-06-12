@@ -140,10 +140,14 @@ function sumRevenueByType_(revenues, types) {
 function determineTraceStatusFromFinal_(rows, kind) {
   const safeRows = rows || [];
   if (!safeRows.length) return 'not_applicable';
-  const traceable = safeRows.filter(row => row.source_row_id && row.import_id && String(row.trace_status || 'traceable') === 'traceable').length;
+  const traceable = safeRows.filter(row => hasRequiredFinanceTrace_(row) && String(row.trace_status || '').toLowerCase() === 'traceable').length;
   if (traceable === safeRows.length) return 'traceable';
   if (traceable > 0) return 'partially_traceable';
   return 'not_traceable';
+}
+
+function hasRequiredFinanceTrace_(row) {
+  return !!(row && row.tenant_id && row.clinic_id && row.import_id && row.source_row_id);
 }
 
 function combineFinalTraceStatuses_(statuses) {
@@ -160,6 +164,16 @@ function determinePocDataStatus_(totalRevenue, expenseCount, traceStatus) {
   if (traceStatus === 'traceable') return 'complete';
   if (traceStatus === 'partially_traceable') return 'estimated';
   return 'incomplete';
+}
+
+function isFinalFinanceStatus_(dataStatus, traceStatus) {
+  return dataStatus === 'complete' && traceStatus === 'traceable';
+}
+
+function getFinanceTrustLabel_(dataStatus, traceStatus) {
+  if (isFinalFinanceStatus_(dataStatus, traceStatus)) return 'final';
+  if (dataStatus === 'incomplete' || traceStatus === 'not_traceable') return 'incomplete/untraceable';
+  return 'estimated';
 }
 
 function writePocAlerts_(tenantId, clinicId, period, metrics) {

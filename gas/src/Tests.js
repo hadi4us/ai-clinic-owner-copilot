@@ -1,5 +1,6 @@
 function smokeTestPhase1() {
-  const result = resetPocFixtureData();
+  const testContext = { actorId: 'test-owner@example.test', role: 'owner', tenantId: APP_CONFIG.defaultTenantId, clinicId: APP_CONFIG.defaultClinicId, source: 'test' };
+  const result = resetPocFixtureDataForContext_(testContext);
   const expected = {
     totalVisits: 5,
     totalRevenue: 1950000,
@@ -12,7 +13,7 @@ function smokeTestPhase1() {
   Object.keys(expected).forEach(key => {
     if (result[key] !== expected[key]) throw new Error(`Smoke test failed for ${key}: expected ${expected[key]}, got ${result[key]}`);
   });
-  const dashboard = getDefaultDashboardPayload('2026-06');
+  const dashboard = getDashboardPayloadForContext_(testContext, '2026-06');
   if (!dashboard.summary || dashboard.summary.totalRevenue !== 1950000 || dashboard.summary.netProfit !== -110000) {
     throw new Error('Smoke test failed: dashboard summary mismatch.');
   }
@@ -41,6 +42,40 @@ function testTraceGateIncompleteExpense() {
   return { ok: true };
 }
 
+function testTraceGateMissingSourceRow() {
+  const status = determineTraceStatusFromFinal_([{ tenant_id: 'klinik_001', clinic_id: 'clinic_001', import_id: 'imp_1', source_row_id: '', trace_status: 'traceable' }], 'revenue');
+  if (status !== 'not_traceable') throw new Error('Missing source_row_id must be not_traceable, got ' + status);
+  return { ok: true };
+}
+
+function testUnknownUserDenied() {
+  try {
+    requireClinicAccess_({ userId: 'unknown@example.test' }, 'klinik_001', 'clinic_001', 'owner');
+  } catch (err) {
+    if (String(err.message).indexOf('FORBIDDEN') !== -1) return { ok: true };
+    throw err;
+  }
+  throw new Error('Unknown user should be denied.');
+}
+
+function testCrossTenantDenied() {
+  const actor = { userId: 'owner@example.test' };
+  const originalGetRows = getRowsAsObjects_;
+  getRowsAsObjects_ = function(sheetName) {
+    if (sheetName === 'USER_ACCESS') return [{ tenant_id: 'tenant_a', user_id: 'owner@example.test', email: 'owner@example.test', role: 'owner', clinic_scope: 'clinic_a', status: 'active' }];
+    return originalGetRows(sheetName);
+  };
+  try {
+    try { requireClinicAccess_(actor, 'tenant_b', 'clinic_a', 'owner'); } catch (err) {
+      if (String(err.message).indexOf('FORBIDDEN') !== -1) return { ok: true };
+      throw err;
+    }
+    throw new Error('Cross-tenant request should be denied.');
+  } finally {
+    getRowsAsObjects_ = originalGetRows;
+  }
+}
+
 function runAllTests() {
   return {
     ok: true,
@@ -48,5 +83,8 @@ function runAllTests() {
     xss: testDashboardEscapingStatic(),
     mutatingGet: testMutatingGetDisabledStatic(),
     traceGate: testTraceGateIncompleteExpense(),
+    traceMissingSource: testTraceGateMissingSourceRow(),
+    unknownUser: testUnknownUserDenied(),
+    crossTenant: testCrossTenantDenied(),
   };
 }

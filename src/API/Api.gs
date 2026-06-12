@@ -8,7 +8,10 @@ function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
   const action = params.action;
   if (action === 'health') return jsonOutput_(healthCheck());
-  if (action === 'dashboardPayload') return jsonOutput_(getDashboardPayload(resolveTenantId_(params), resolveClinicId_(params), params.period || getLatestAvailablePeriod_() || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
+  if (action === 'dashboardPayload') {
+    const context = resolveRequestContext_(params, {}, 'owner');
+    return jsonOutput_(getDashboardPayloadForContext_(context, params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
+  }
   if (['setup', 'compute', 'resetFixture', 'upload'].indexOf(action) !== -1) {
     return jsonOutput_({ ok: false, error: 'MUTATING_GET_DISABLED', message: 'Action mutasi hanya tersedia via POST dengan token pilot.' });
   }
@@ -25,30 +28,27 @@ function doPost(e) {
   const action = params.action || payload.action;
   if (action === 'upload') {
     assertPilotMutationAllowed_(params, payload);
-    return jsonOutput_(uploadPocFile(payload.base64Data, payload.fileName, payload.mimeType, payload.options || {}));
+    const context = resolveRequestContext_(params, payload, 'owner');
+    return jsonOutput_(uploadPocFileForContext_(context, payload.base64Data, payload.fileName, payload.mimeType, payload.options || {}));
   }
   if (action === 'setup') {
+    // Bootstrap exception: setup may need to create initial USER_ACCESS from PILOT_OWNER_EMAIL.
     assertPilotMutationAllowed_(params, payload);
     return jsonOutput_(setupFinalWarehouseSheets());
   }
   if (action === 'compute') {
     assertPilotMutationAllowed_(params, payload);
-    return jsonOutput_(computePocKpis(resolveTenantId_(payload), resolveClinicId_(payload), payload.period || params.period || getLatestAvailablePeriod_() || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
+    const context = resolveRequestContext_(params, payload, 'owner');
+    return jsonOutput_(computePocKpis(context.tenantId, context.clinicId, payload.period || params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
   }
   if (action === 'resetFixture') {
     assertPilotMutationAllowed_(params, payload);
-    return jsonOutput_(resetPocFixtureData());
+    const context = resolveRequestContext_(params, payload, 'owner');
+    return jsonOutput_(resetPocFixtureDataForContext_(context));
   }
   return jsonOutput_({ ok: false, error: 'Unknown action' });
 }
 
-function resolveTenantId_(params) {
-  return params && params.tenantId ? params.tenantId : APP_CONFIG.defaultTenantId;
-}
-
-function resolveClinicId_(params) {
-  return params && params.clinicId ? params.clinicId : APP_CONFIG.defaultClinicId;
-}
 
 function assertPilotMutationAllowed_(params, payload) {
   const expected = getPilotMutationToken_();

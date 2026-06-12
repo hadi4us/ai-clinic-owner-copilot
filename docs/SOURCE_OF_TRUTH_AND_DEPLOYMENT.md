@@ -26,8 +26,11 @@ The root `src/` tree is a clean architecture mirror/reference. Do not edit root 
 
 - Public `GET` is read-only except dashboard rendering and health/dashboard payload.
 - Mutating actions (`setup`, `compute`, `resetFixture`, `upload`) are POST-only for API calls and require `PILOT_MUTATION_TOKEN` when called through `doPost`.
-- Dashboard internal `google.script.run.uploadPocFile` remains available to users who can access the web app UI; do not expose the pilot web app anonymously for real clinic data.
-- For real pilot data, change web app access away from `ANYONE_ANONYMOUS` before deployment.
+- Dashboard/API data calls resolve tenant/clinic from `USER_ACCESS`, using the active Google session. Query/body `tenantId` and `clinicId` are only selectors after `requireClinicAccess_` passes.
+- Dashboard internal `google.script.run.uploadPocFile` also resolves the same verified session context before import.
+- Unknown users and cross-tenant requests are denied. `Session.getEffectiveUser()` is audit metadata only and is never used as actor fallback.
+- Bootstrap setup is the only token-only mutating action because it may need to create initial `USER_ACCESS` from Script Property `PILOT_OWNER_EMAIL`. After setup, data/dashboard/import/compute/reset require verified session access.
+- Manifest web app access is set to `ANYONE` (Google sign-in required), not `ANYONE_ANONYMOUS`. Keep it non-anonymous for pilot data and set Script Property `PILOT_OWNER_EMAIL` before running setup.
 
 ## Hot write-path policy
 

@@ -22,14 +22,27 @@ function getDashboardPayload(tenantId, clinicId, period) {
   };
 }
 
+function getDashboardPayloadForContext_(context, period) {
+  return getDashboardPayload(context.tenantId, context.clinicId, period);
+}
+
 function getDefaultDashboardPayload(period) {
-  return getDashboardPayload(APP_CONFIG.defaultTenantId, APP_CONFIG.defaultClinicId, period || getLatestAvailablePeriod_() || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'));
+  const context = resolveRequestContext_({}, {}, 'owner');
+  return getDashboardPayloadForContext_(context, period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'));
 }
 
 function getLatestAvailablePeriod_() {
-  const rows = getRowsAsObjects_('KPI_BULANAN').filter(r => r.tenant_id === APP_CONFIG.defaultTenantId && r.clinic_id === APP_CONFIG.defaultClinicId);
+  return getLatestAvailablePeriodForScope_(APP_CONFIG.defaultTenantId, APP_CONFIG.defaultClinicId);
+}
+
+function getLatestAvailablePeriodForContext_(context) {
+  return getLatestAvailablePeriodForScope_(context.tenantId, context.clinicId);
+}
+
+function getLatestAvailablePeriodForScope_(tenantId, clinicId) {
+  const rows = getRowsAsObjects_('KPI_BULANAN').filter(r => r.tenant_id === tenantId && r.clinic_id === clinicId);
   if (rows.length) return rows.map(r => String(r.period)).sort().pop();
-  const rev = getRowsAsObjects_('PENDAPATAN').filter(r => r.tenant_id === APP_CONFIG.defaultTenantId && r.clinic_id === APP_CONFIG.defaultClinicId);
+  const rev = getRowsAsObjects_('PENDAPATAN').filter(r => r.tenant_id === tenantId && r.clinic_id === clinicId);
   if (rev.length) return rev.map(r => toPeriodString_(r.transaction_date)).sort().pop();
   return '';
 }
@@ -52,6 +65,8 @@ function normalizeSummaryForClient_(row) {
     profitGrowth: row.profit_growth === '' || row.profit_growth === null || row.profit_growth === undefined ? null : Number(row.profit_growth),
     dataStatus: row.data_status || row.dataStatus || 'unknown',
     traceStatus: row.trace_status || row.traceStatus || 'unknown',
+    financeFinal: isFinalFinanceStatus_(row.data_status || row.dataStatus, row.trace_status || row.traceStatus),
+    financeLabel: getFinanceTrustLabel_(row.data_status || row.dataStatus, row.trace_status || row.traceStatus),
   };
 }
 

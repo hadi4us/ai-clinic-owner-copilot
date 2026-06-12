@@ -16,6 +16,7 @@ function seedPocConfig_() {
   if (clinicSheet.getLastRow() < 2) {
     appendObjects_('MASTER_KLINIK', [{ tenant_id: APP_CONFIG.defaultTenantId, clinic_id: APP_CONFIG.defaultClinicId, clinic_name: 'Klinik Sehat Sentosa', clinic_type: 'pratama', city: '', address_summary: '', timezone: APP_CONFIG.timezone, currency: 'IDR', status: 'active', created_at: now, updated_at: now }]);
   }
+  seedPilotOwnerAccess_(now);
   const settingsSheet = ensureSheet_('SETTINGS');
   if (settingsSheet.getLastRow() < 2) {
     appendObjects_('SETTINGS', [
@@ -25,11 +26,49 @@ function seedPocConfig_() {
   }
 }
 
+
+function seedPilotOwnerAccess_(now) {
+  const ownerEmail = getScriptPropertySafe_('PILOT_OWNER_EMAIL', '');
+  if (!ownerEmail) return;
+  const sheet = ensureSheet_('USER_ACCESS');
+  const existing = getRowsAsObjects_('USER_ACCESS').some(row => String(row.email || '').toLowerCase() === String(ownerEmail).toLowerCase());
+  if (existing) return;
+  appendObjects_('USER_ACCESS', [{
+    tenant_id: APP_CONFIG.defaultTenantId,
+    user_id: String(ownerEmail).toLowerCase(),
+    user_name: 'Pilot Owner',
+    email: String(ownerEmail).toLowerCase(),
+    telegram_id: '',
+    whatsapp_id: '',
+    role: 'owner',
+    clinic_scope: APP_CONFIG.defaultClinicId,
+    status: 'active',
+    last_login_at: '',
+    created_at: now,
+    updated_at: now,
+  }]);
+}
+
+function getScriptPropertySafe_(key, fallbackValue) {
+  try {
+    const value = PropertiesService.getScriptProperties().getProperty(key);
+    return value === null || value === undefined || value === '' ? fallbackValue : value;
+  } catch (err) {
+    return fallbackValue;
+  }
+}
+
 function resetPocFixtureData() {
-  return withTenantClinicLock_('reset_poc_fixture_data', APP_CONFIG.defaultTenantId, APP_CONFIG.defaultClinicId, function() {
+  const context = resolveRequestContext_({}, {}, 'owner');
+  return resetPocFixtureDataForContext_(context);
+}
+
+function resetPocFixtureDataForContext_(context) {
+  assertContextScope_(context, context.tenantId, context.clinicId);
+  return withTenantClinicLock_('reset_poc_fixture_data', context.tenantId, context.clinicId, function() {
     ensurePhase1WarehouseSheetsNoLock_();
     ['IMPORT_BATCH', 'IMPORT_FILE', 'VALIDATION_LOG', 'RAW_IMPORT', 'KUNJUNGAN', 'TINDAKAN', 'RESEP', 'PENDAPATAN', 'BIAYA', 'KPI_HARIAN', 'KPI_BULANAN', 'ALERT_LOG', 'SYNC_LOG'].forEach(clearSheetDataByName_);
     seedPocFixtureData_();
-    return computePocKpisNoLock_(APP_CONFIG.defaultTenantId, APP_CONFIG.defaultClinicId, '2026-06');
+    return computePocKpisNoLock_(context.tenantId, context.clinicId, '2026-06');
   });
 }
