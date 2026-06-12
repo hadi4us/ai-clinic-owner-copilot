@@ -8,6 +8,7 @@ function getDashboardPayload(tenantId, clinicId, period) {
     .sort((a, b) => String(a.kpi_date).localeCompare(String(b.kpi_date)));
   const revenueBreakdown = buildRevenueBreakdown_(tenantId, clinicId, period);
   const costBreakdown = buildCostBreakdown_(tenantId, clinicId, period);
+  const dataQualityWarnings = getDashboardDataQualityWarnings_(tenantId, clinicId, period);
   return {
     appName: APP_CONFIG.appName,
     tenantId,
@@ -17,6 +18,7 @@ function getDashboardPayload(tenantId, clinicId, period) {
     revenueBreakdown,
     costBreakdown,
     alerts: alerts.map(normalizeAlertForClient_),
+    dataQualityWarnings: dataQualityWarnings.map(normalizeValidationIssueForClient_),
     trend: daily.map(normalizeDailyTrendForClient_),
     generatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
   };
@@ -68,6 +70,20 @@ function normalizeSummaryForClient_(row) {
     financeFinal: isFinalFinanceStatus_(row.data_status || row.dataStatus, row.trace_status || row.traceStatus),
     financeLabel: getFinanceTrustLabel_(row.data_status || row.dataStatus, row.trace_status || row.traceStatus),
   };
+}
+
+function getDashboardDataQualityWarnings_(tenantId, clinicId, period) {
+  const importIds = {};
+  getRowsAsObjects_('PENDAPATAN').concat(getRowsAsObjects_('BIAYA'), getRowsAsObjects_('TINDAKAN'), getRowsAsObjects_('RESEP'))
+    .filter(row => inScope_(row, tenantId, clinicId) && (isInPeriod_(row.transaction_date, period) || isInPeriod_(row.expense_date, period) || isInPeriod_(row.procedure_date, period) || isInPeriod_(row.prescription_date, period)))
+    .forEach(row => { if (row.import_id) importIds[row.import_id] = true; });
+  return getRowsAsObjects_('VALIDATION_LOG')
+    .filter(row => row.tenant_id === tenantId && row.clinic_id === clinicId && importIds[row.import_id] && String(row.resolved || 'false').toLowerCase() !== 'true')
+    .slice(0, 20);
+}
+
+function normalizeValidationIssueForClient_(row) {
+  return { severity: row.severity, issueType: row.issue_type, targetSheet: row.target_sheet, rowNumber: row.row_number, columnName: row.column_name, message: row.message };
 }
 
 function buildRevenueBreakdown_(tenantId, clinicId, period) {

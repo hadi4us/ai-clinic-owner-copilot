@@ -40,3 +40,13 @@ If the lock is busy, return a clear retry message instead of running concurrent 
 ## Non-canonical tree rule
 
 If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until a deliberate clasp migration is tested and documented.
+
+
+## Import/data-quality guardrails
+
+- Pilot uploads accept only CSV/XLS/XLSX-like files and reject unsupported MIME/extensions before conversion.
+- Default pilot limits: 5 MB, 5,000 data rows, 8 sheets. Prefer CSV for pilot imports.
+- File checksum idempotency rejects duplicate completed uploads unless `allowDuplicate` is explicitly set.
+- Duplicate rows inside one file are skipped and written to `VALIDATION_LOG` as `duplicate_source_row`.
+- Sensitive patient columns are blocked before `RAW_IMPORT` storage; rejected PHI rows are not persisted raw.
+- Critical import validation errors (`severity=error`, unresolved) mark KPI `data_status=incomplete` and are shown in dashboard Data Quality.

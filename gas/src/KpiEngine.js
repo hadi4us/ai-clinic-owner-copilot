@@ -28,7 +28,8 @@ function computePocKpisNoLock_(tenantId, clinicId, period) {
   const revenueTrace = determineTraceStatusFromFinal_(revenues, 'revenue');
   const expenseTrace = determineTraceStatusFromFinal_(expenses, 'expense');
   const traceStatus = combineFinalTraceStatuses_([revenueTrace, expenseTrace]);
-  const dataStatus = determinePocDataStatus_(totalRevenue, expenses.length, traceStatus);
+  const criticalIssues = getOpenCriticalValidationIssues_(tenantId, clinicId, period, revenues.concat(expenses, procedures, prescriptions));
+  const dataStatus = determinePocDataStatus_(totalRevenue, expenses.length, traceStatus, criticalIssues.length);
   const bpjsClaimAmount = sumByField_(bpjsClaims, 'claim_amount');
   const bpjsPaidAmount = sumByField_(bpjsClaims, 'paid_amount');
   const bpjsOutstandingAmount = sumByField_(bpjsClaims, 'outstanding_amount');
@@ -63,8 +64,8 @@ function computePocKpisNoLock_(tenantId, clinicId, period) {
     computed_at: now,
   });
   computePocDailyKpis_(tenantId, clinicId, period, revenues, prescriptions, procedures, expenses, visits, bpjsClaims, inventory, taxes, traceStatus, dataStatus);
-  writePocAlerts_(tenantId, clinicId, period, { totalRevenue, totalCost, netProfit, profitMargin, dataStatus, traceStatus, expenseRows: expenses.length });
-  return { tenantId, clinicId, period, totalVisits: visits.length, totalRevenue, totalCost, grossProfit, netProfit, profitMargin, dataStatus, traceStatus };
+  writePocAlerts_(tenantId, clinicId, period, { totalRevenue, totalCost, netProfit, profitMargin, dataStatus, traceStatus, expenseRows: expenses.length, criticalIssues });
+  return { tenantId, clinicId, period, totalVisits: visits.length, totalRevenue, totalCost, grossProfit, netProfit, profitMargin, dataStatus, traceStatus, dataQualityWarnings: criticalIssues.length };
 }
 
 function computePhase1Metrics(tenantId, clinicId, period) {
@@ -158,12 +159,24 @@ function combineFinalTraceStatuses_(statuses) {
   return 'not_traceable';
 }
 
-function determinePocDataStatus_(totalRevenue, expenseCount, traceStatus) {
+function determinePocDataStatus_(totalRevenue, expenseCount, traceStatus, criticalIssueCount) {
+  if (criticalIssueCount > 0) return 'incomplete';
   if (totalRevenue === 0) return 'incomplete';
   if (!expenseCount) return 'estimated';
   if (traceStatus === 'traceable') return 'complete';
   if (traceStatus === 'partially_traceable') return 'estimated';
   return 'incomplete';
+}
+
+function getOpenCriticalValidationIssues_(tenantId, clinicId, period, sourceRows) {
+  const importIds = {};
+  (sourceRows || []).forEach(row => { if (row.import_id) importIds[row.import_id] = true; });
+  if (!Object.keys(importIds).length) {
+    getRowsAsObjects_('IMPORT_BATCH')
+      .filter(row => row.tenant_id === tenantId && row.clinic_id === clinicId && String(row.period_start || '').slice(0, 7) === period)
+      .forEach(row => { if (row.import_id) importIds[row.import_id] = true; });
+  }
+  return getRowsAsObjects_('VALIDATION_LOG').filter(row => row.tenant_id === tenantId && row.clinic_id === clinicId && importIds[row.import_id] && String(row.severity || '').toLowerCase() === 'error' && String(row.resolved || 'false').toLowerCase() !== 'true');
 }
 
 function isFinalFinanceStatus_(dataStatus, traceStatus) {
@@ -182,6 +195,7 @@ function writePocAlerts_(tenantId, clinicId, period, metrics) {
   if (metrics.totalRevenue === 0) rows.push(makeAlert_(tenantId, clinicId, 'finance', 'critical', 'Revenue belum ada', 'Data revenue belum tersedia untuk periode ini.', `total_revenue:${period}`));
   if (metrics.expenseRows === 0) rows.push(makeAlert_(tenantId, clinicId, 'finance', 'warning', 'Biaya belum lengkap', 'Data biaya belum tersedia. Profit ditandai estimated.', `total_cost:${period}`));
   if (metrics.netProfit < 0) rows.push(makeAlert_(tenantId, clinicId, 'finance', 'high', 'Profit negatif', 'Net profit periode ini negatif. Cek revenue dan biaya terbesar.', `net_profit:${period}`));
+  if (metrics.criticalIssues && metrics.criticalIssues.length) rows.push(makeAlert_(tenantId, clinicId, 'data_quality', 'critical', 'Data quality blocking', `${metrics.criticalIssues.length} error validasi masih open. Angka finance ditandai incomplete.`, `data_quality:${period}`));
   replaceObjects_('ALERT_LOG', existing.concat(rows));
 }
 

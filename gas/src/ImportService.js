@@ -4,24 +4,40 @@
  * No AI logic here.
  */
 function uploadPocFile(base64Data, fileName, mimeType, options) {
-  const opts = options || {};
+  const context = resolveRequestContext_({}, options || {}, 'owner');
+  return uploadPocFileForContext_(context, base64Data, fileName, mimeType, options || {});
+}
+
+function uploadPocFileForContext_(context, base64Data, fileName, mimeType, options) {
   if (!base64Data) throw new Error('File kosong. Upload Excel/CSV terlebih dahulu.');
+  const opts = Object.assign({}, options || {}, { tenantId: context.tenantId, clinicId: context.clinicId, actorId: context.actorId });
+  assertContextScope_(context, opts.tenantId, opts.clinicId);
   const bytes = Utilities.base64Decode(String(base64Data).split(',').pop());
-  const blob = Utilities.newBlob(bytes, mimeType || MimeType.MICROSOFT_EXCEL, fileName || 'upload.xlsx');
+  const contentType = mimeType || inferMimeTypeFromFileName_(fileName || 'upload.xlsx');
+  const blob = Utilities.newBlob(bytes, contentType, fileName || 'upload.xlsx');
+  validateUploadBlob_(blob, opts);
   return importUploadedBlob_(blob, opts);
 }
 
+
 function importUploadedBlob_(blob, options) {
   const opts = options || {};
+  validateUploadBlob_(blob, opts);
   const fileName = blob.getName() || 'upload';
   const lowerName = fileName.toLowerCase();
+  const fileChecksum = computeBlobChecksum_(blob);
   const importId = opts.importId || `imp_${Utilities.getUuid().replace(/-/g, '').slice(0, 12)}`;
   const tenantId = opts.tenantId || APP_CONFIG.defaultTenantId;
   const clinicId = opts.clinicId || APP_CONFIG.defaultClinicId;
   return withTenantClinicLock_('import_uploaded_blob', tenantId, clinicId, function() {
   ensurePhase1WarehouseSheetsNoLock_();
-  const sourceSystem = opts.sourceSystem || 'generic_excel';
   const now = new Date();
+  const duplicate = findCompletedImportByChecksum_(tenantId, clinicId, fileChecksum);
+  if (duplicate && !opts.allowDuplicate) {
+    appendSyncLog_(tenantId, clinicId, importId, 'import', opts.sourceSystem || 'generic_excel', 'duplicate', now, new Date(), 0, 0, 0, 'Duplicate upload rejected: same checksum already imported as ' + duplicate.import_id);
+    return { ok: false, duplicate: true, importId, duplicateImportId: duplicate.import_id, rowsRead: 0, rowsWritten: 0, rowsFailed: 0, importedSheets: [], message: 'File duplicate. Upload ditolak agar KPI tidak double-count.' };
+  }
+  const sourceSystem = opts.sourceSystem || 'generic_excel';
 
   appendObjects_('IMPORT_BATCH', [{
     tenant_id: tenantId,
@@ -35,7 +51,7 @@ function importUploadedBlob_(blob, options) {
     data_status: 'partial',
     started_at: now,
     completed_at: '',
-    created_by: opts.createdBy || 'dashboard_upload',
+    created_by: opts.actorId || opts.createdBy || 'dashboard_upload',
     notes: fileName,
   }]);
 
@@ -47,39 +63,34 @@ function importUploadedBlob_(blob, options) {
     file_name: fileName,
     file_type: lowerName.endsWith('.csv') ? 'csv' : 'xlsx',
     source_report_name: opts.sourceReportName || 'POC_UPLOAD',
-    checksum: '',
+    checksum: fileChecksum,
     row_count: 0,
     uploaded_at: now,
-    uploaded_by: opts.createdBy || 'dashboard_upload',
+    uploaded_by: opts.actorId || opts.createdBy || 'dashboard_upload',
     status: 'uploaded',
   }]);
 
   let result;
-  if (lowerName.endsWith('.csv') || String(blob.getContentType()).indexOf('csv') !== -1) {
-    result = importCsvBlob_(blob, importId, tenantId, clinicId, opts);
-  } else {
-    result = importExcelBlob_(blob, importId, tenantId, clinicId, opts);
+  try {
+    if (lowerName.endsWith('.csv') || String(blob.getContentType()).indexOf('csv') !== -1) {
+      result = importCsvBlob_(blob, importId, tenantId, clinicId, opts);
+    } else {
+      result = importExcelBlob_(blob, importId, tenantId, clinicId, opts);
+    }
+  } catch (err) {
+    finalizeImportMetadata_(tenantId, clinicId, importId, 'failed', 'invalid', 0, opts.period || '', fileChecksum);
+    appendSyncLog_(tenantId, clinicId, importId, 'import', sourceSystem, 'failed', now, new Date(), 0, 0, 0, err.message || String(err));
+    throw new Error('Import gagal: ' + (err.message || err));
   }
 
-  const period = opts.period || inferImportPeriod_(result) || toPeriodString_(new Date());
+  const period = opts.period || inferImportPeriodForScope_(tenantId, clinicId) || toPeriodString_(new Date());
+  const importStatus = result.rowsWritten > 0 ? (result.rowsFailed > 0 ? 'partial' : 'completed') : 'failed';
+  const dataStatus = result.rowsFailed > 0 ? 'partial' : 'complete';
+  finalizeImportMetadata_(tenantId, clinicId, importId, importStatus, dataStatus, result.rowsRead, period, fileChecksum);
   const kpi = computePocKpisNoLock_(tenantId, clinicId, period);
-  appendObjects_('SYNC_LOG', [{
-    tenant_id: tenantId,
-    clinic_id: clinicId,
-    sync_id: importId,
-    job_type: 'import',
-    source_system: sourceSystem,
-    import_id: importId,
-    status: 'success',
-    started_at: now,
-    finished_at: new Date(),
-    rows_read: result.rowsRead,
-    rows_written: result.rowsWritten,
-    rows_failed: result.rowsFailed,
-    error_message: '',
-  }]);
-  writeAudit_('dashboard_upload', 'owner', 'upload_poc_file', 'IMPORT_BATCH', { importId, fileName, rowsWritten: result.rowsWritten, period });
-  return Object.assign({ ok: true, importId, period, kpi }, result);
+  appendSyncLog_(tenantId, clinicId, importId, 'import', sourceSystem, importStatus === 'failed' ? 'failed' : 'success', now, new Date(), result.rowsRead, result.rowsWritten, result.rowsFailed, result.rowsFailed > 0 ? 'Import completed with validation failures. See VALIDATION_LOG.' : '');
+  writeAudit_(opts.actorId || 'dashboard_upload', 'owner', 'upload_poc_file', 'IMPORT_BATCH', { importId, fileName, rowsWritten: result.rowsWritten, rowsFailed: result.rowsFailed, period });
+  return Object.assign({ ok: importStatus !== 'failed', importId, period, kpi, importStatus, dataStatus }, result);
   });
 }
 
@@ -87,7 +98,9 @@ function importCsvBlob_(blob, importId, tenantId, clinicId, options) {
   const csvText = blob.getDataAsString();
   const values = Utilities.parseCsv(csvText);
   if (!values.length) return { rowsRead: 0, rowsWritten: 0, rowsFailed: 0, importedSheets: [] };
-  const targetSheet = options.targetSheet || detectTargetSheetFromHeaders_(values[0]) || 'PENDAPATAN';
+  assertImportRowLimit_(values.length - 1);
+  const targetSheet = options.targetSheet || detectTargetSheetFromHeaders_(values[0]);
+  if (!targetSheet) throw new Error('Header CSV tidak dikenali. Sertakan kolom tanggal + amount/nilai atau pilih targetSheet eksplisit.');
   const rows = tableValuesToObjects_(values);
   return importObjectRowsToFinalSheet_(targetSheet, rows, importId, tenantId, clinicId, 'CSV');
 }
@@ -103,12 +116,15 @@ function importExcelBlob_(blob, importId, tenantId, clinicId, options) {
   let rowsWritten = 0;
   let rowsFailed = 0;
 
-  tempSpreadsheet.getSheets().forEach(sheet => {
+  const sheets = tempSpreadsheet.getSheets();
+  assertImportSheetLimit_(sheets.length);
+  sheets.forEach(sheet => {
     const sheetName = String(sheet.getName()).trim().toUpperCase();
     const targetSheet = SHEET_SCHEMAS[sheetName] ? sheetName : detectTargetSheetFromHeaders_(sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0]);
     if (!targetSheet || ['IMPORT_BATCH', 'IMPORT_FILE', 'VALIDATION_LOG', 'RAW_IMPORT'].indexOf(targetSheet) !== -1) return;
     const values = sheet.getDataRange().getValues();
     if (values.length < 2) return;
+    assertImportRowLimit_(rowsRead + values.length - 1);
     const rows = tableValuesToObjects_(values);
     const result = importObjectRowsToFinalSheet_(targetSheet, rows, importId, tenantId, clinicId, sheet.getName());
     rowsRead += result.rowsRead;
@@ -136,8 +152,22 @@ function importObjectRowsToFinalSheet_(targetSheet, sourceRows, importId, tenant
   let rowsFailed = 0;
   const rawRows = [];
   const finalRows = [];
+  const seenPayloadHashes = {};
   rows.forEach((sourceRow, index) => {
     const sourceRowId = `${sourceSheetName || targetSheet}_${index + 1}`;
+    const payloadHash = computePayloadHash_(sourceRow);
+    if (seenPayloadHashes[payloadHash]) {
+      rowsFailed++;
+      appendValidationLog_(tenantId, clinicId, importId, targetSheet, index + 2, '', 'error', 'duplicate_source_row', 'Duplicate row dalam file dilewati agar KPI tidak double-count.', payloadHash, payloadHash);
+      return;
+    }
+    seenPayloadHashes[payloadHash] = true;
+    if (rowHasSensitiveKeys_(sourceRow)) {
+      rowsFailed++;
+      appendValidationLog_(tenantId, clinicId, importId, targetSheet, index + 2, '', 'error', 'sensitive_field_blocked', 'Field sensitif pasien terdeteksi. Row dilewati dan tidak disimpan ke RAW_IMPORT.', '', '');
+      return;
+    }
+
     rawRows.push({
       tenant_id: tenantId,
       clinic_id: clinicId,
@@ -149,15 +179,9 @@ function importObjectRowsToFinalSheet_(targetSheet, sourceRows, importId, tenant
       source_sheet_name: sourceSheetName || targetSheet,
       source_row_id: sourceRowId,
       raw_payload: JSON.stringify(sourceRow),
-      payload_hash: Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(sourceRow))).slice(0, 24),
+      payload_hash: payloadHash,
       imported_at: new Date(),
     });
-
-    if (rowHasSensitiveKeys_(sourceRow)) {
-      rowsFailed++;
-      appendValidationLog_(tenantId, clinicId, importId, targetSheet, index + 2, '', 'error', 'sensitive_field_blocked', 'Field sensitif pasien terdeteksi. Row dilewati.', '', '');
-      return;
-    }
 
     const mapped = mapGenericRowToFinalSheet_(targetSheet, sourceRow, importId, tenantId, clinicId, sourceRowId, index);
     const validation = validateFinalRow_(targetSheet, mapped, index + 2);
@@ -255,6 +279,12 @@ function validateFinalRow_(targetSheet, row, rowNumber) {
   ['transaction_date', 'expense_date', 'visit_date', 'procedure_date', 'prescription_date'].forEach(field => {
     if (row[field] && !/^\d{4}-\d{2}-\d{2}/.test(String(row[field]))) errors.push({ rowNumber, columnName: field, issueType: 'invalid_date', message: `Format tanggal harus YYYY-MM-DD: ${field}`, sourceValue: row[field], normalizedValue: row[field] });
   });
+  if (targetSheet === 'PENDAPATAN' && asNumber_(row.net_amount, 0) <= 0) {
+    errors.push({ rowNumber, columnName: 'net_amount', issueType: 'invalid_amount', message: 'Nilai pendapatan harus lebih dari 0.', sourceValue: row.net_amount, normalizedValue: row.net_amount });
+  }
+  if (targetSheet === 'BIAYA' && asNumber_(row.amount, 0) <= 0) {
+    errors.push({ rowNumber, columnName: 'amount', issueType: 'invalid_amount', message: 'Nilai biaya harus lebih dari 0.', sourceValue: row.amount, normalizedValue: row.amount });
+  }
   return { ok: errors.length === 0, errors };
 }
 
@@ -262,8 +292,82 @@ function appendValidationLog_(tenantId, clinicId, importId, targetSheet, rowNumb
   appendObjects_('VALIDATION_LOG', [{ validation_id: Utilities.getUuid(), tenant_id: tenantId, clinic_id: clinicId, import_id: importId, file_id: importId + '_file', target_sheet: targetSheet, row_number: rowNumber, column_name: columnName, severity, issue_type: issueType, message, source_value: sourceValue, normalized_value: normalizedValue, resolved: false, created_at: new Date() }]);
 }
 
+function validateUploadBlob_(blob, options) {
+  const fileName = String(blob.getName() || '').toLowerCase();
+  const contentType = String(blob.getContentType() || '').toLowerCase();
+  const size = blob.getBytes().length;
+  const maxBytes = (options && options.maxUploadBytes) || APP_CONFIG.maxUploadBytes || (5 * 1024 * 1024);
+  if (size > maxBytes) throw new Error(`File terlalu besar (${size} bytes). Maksimum pilot ${maxBytes} bytes. Gunakan CSV terfilter.`);
+  if (!isSupportedUploadType_(fileName, contentType)) throw new Error('Format file tidak didukung. Gunakan CSV atau XLSX untuk pilot.');
+}
+
+function isSupportedUploadType_(fileName, contentType) {
+  if (/\.csv$/.test(fileName) || contentType.indexOf('csv') !== -1 || contentType === 'text/plain') return true;
+  if (/\.xlsx?$/.test(fileName)) return true;
+  if (contentType.indexOf('spreadsheet') !== -1 || contentType.indexOf('excel') !== -1 || contentType.indexOf('officedocument') !== -1) return true;
+  return false;
+}
+
+function inferMimeTypeFromFileName_(fileName) {
+  return String(fileName || '').toLowerCase().endsWith('.csv') ? 'text/csv' : MimeType.MICROSOFT_EXCEL;
+}
+
+function assertImportRowLimit_(rowCount) {
+  const maxRows = APP_CONFIG.maxImportRows || 5000;
+  if (rowCount > maxRows) throw new Error(`Jumlah row import terlalu besar (${rowCount}). Maksimum pilot ${maxRows}. Pecah file atau filter periode.`);
+}
+
+function assertImportSheetLimit_(sheetCount) {
+  const maxSheets = APP_CONFIG.maxImportSheets || 8;
+  if (sheetCount > maxSheets) throw new Error(`Jumlah sheet terlalu banyak (${sheetCount}). Maksimum pilot ${maxSheets}. Upload CSV lebih disarankan.`);
+}
+
+function computeBlobChecksum_(blob) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, blob.getBytes())).slice(0, 32);
+}
+
+function computePayloadHash_(row) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, JSON.stringify(row || {}))).slice(0, 32);
+}
+
+function findCompletedImportByChecksum_(tenantId, clinicId, checksum) {
+  if (!checksum) return null;
+  return getRowsAsObjects_('IMPORT_FILE').find(row => row.tenant_id === tenantId && row.clinic_id === clinicId && row.checksum === checksum && String(row.status || '').toLowerCase() === 'completed') || null;
+}
+
+function finalizeImportMetadata_(tenantId, clinicId, importId, importStatus, dataStatus, rowCount, period, checksum) {
+  const batches = getRowsAsObjects_('IMPORT_BATCH').map(row => {
+    if (row.tenant_id === tenantId && row.clinic_id === clinicId && row.import_id === importId) {
+      row.status = importStatus;
+      row.data_status = dataStatus;
+      row.period_start = period ? period + '-01' : row.period_start;
+      row.period_end = period ? period + '-31' : row.period_end;
+      row.completed_at = new Date();
+    }
+    return row;
+  });
+  replaceObjects_('IMPORT_BATCH', batches);
+  const files = getRowsAsObjects_('IMPORT_FILE').map(row => {
+    if (row.tenant_id === tenantId && row.clinic_id === clinicId && row.import_id === importId) {
+      row.checksum = checksum || row.checksum;
+      row.row_count = rowCount;
+      row.status = importStatus === 'completed' || importStatus === 'partial' ? 'completed' : 'failed';
+    }
+    return row;
+  });
+  replaceObjects_('IMPORT_FILE', files);
+}
+
+function appendSyncLog_(tenantId, clinicId, importId, jobType, sourceSystem, status, startedAt, finishedAt, rowsRead, rowsWritten, rowsFailed, errorMessage) {
+  appendObjects_('SYNC_LOG', [{ tenant_id: tenantId, clinic_id: clinicId, sync_id: importId, job_type: jobType, source_system: sourceSystem, import_id: importId, status, started_at: startedAt, finished_at: finishedAt, rows_read: rowsRead, rows_written: rowsWritten, rows_failed: rowsFailed, error_message: errorMessage || '' }]);
+}
+
 function inferImportPeriod_(result) {
-  const rows = getRowsAsObjects_('PENDAPATAN').concat(getRowsAsObjects_('BIAYA'));
+  return inferImportPeriodForScope_(APP_CONFIG.defaultTenantId, APP_CONFIG.defaultClinicId);
+}
+
+function inferImportPeriodForScope_(tenantId, clinicId) {
+  const rows = getRowsAsObjects_('PENDAPATAN').concat(getRowsAsObjects_('BIAYA')).filter(row => inScope_(row, tenantId, clinicId));
   if (!rows.length) return '';
   const last = rows[rows.length - 1];
   return toPeriodString_(last.transaction_date || last.expense_date || new Date());

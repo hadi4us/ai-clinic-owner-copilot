@@ -20,6 +20,9 @@ const APP_CONFIG = {
     dateFormat: 'yyyy-MM-dd',
     monthFormat: 'yyyy-MM',
     lockWaitMs: 30000,
+    maxUploadBytes: 5 * 1024 * 1024,
+    maxImportRows: 5000,
+    maxImportSheets: 8,
   }),
 
   storage: Object.freeze({
@@ -67,6 +70,9 @@ APP_CONFIG.schemaVersion = APP_CONFIG.app.schemaVersion;
 APP_CONFIG.appName = APP_CONFIG.app.name;
 APP_CONFIG.timezone = APP_CONFIG.runtime.timezone;
 APP_CONFIG.lockWaitMs = APP_CONFIG.runtime.lockWaitMs;
+APP_CONFIG.maxUploadBytes = APP_CONFIG.runtime.maxUploadBytes;
+APP_CONFIG.maxImportRows = APP_CONFIG.runtime.maxImportRows;
+APP_CONFIG.maxImportSheets = APP_CONFIG.runtime.maxImportSheets;
 Object.freeze(APP_CONFIG);
 
 const PHASE1_FIXTURE = Object.freeze({

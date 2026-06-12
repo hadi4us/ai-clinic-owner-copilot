@@ -76,6 +76,32 @@ function testCrossTenantDenied() {
   }
 }
 
+
+function testCriticalValidationBlocksFinalKpi() {
+  const status = determinePocDataStatus_(1000000, 1, 'traceable', 1);
+  if (status !== 'incomplete') throw new Error('Critical validation issue must mark KPI incomplete, got ' + status);
+  return { ok: true };
+}
+
+function testImportValidationRejectsInvalidAmount() {
+  const row = { tenant_id: 'klinik_001', clinic_id: 'clinic_001', revenue_id: 'rev_1', transaction_id: 'trx_1', transaction_date: '2026-06-01', net_amount: 0 };
+  const validation = validateFinalRow_('PENDAPATAN', row, 2);
+  if (validation.ok) throw new Error('Zero revenue amount should be invalid.');
+  if (!validation.errors.some(err => err.issueType === 'invalid_amount')) throw new Error('Expected invalid_amount validation error.');
+  return { ok: true };
+}
+
+function testSupportedUploadTypeGuard() {
+  if (!isSupportedUploadType_('report.csv', 'text/csv')) throw new Error('CSV should be supported.');
+  if (isSupportedUploadType_('malware.exe', 'application/octet-stream')) throw new Error('Unsupported executable should be rejected.');
+  return { ok: true };
+}
+
+function testSensitiveRowsDetectedBeforeRawStorage() {
+  if (!rowHasSensitiveKeys_({ nama_pasien: 'Budi', amount: 100000 })) throw new Error('Sensitive patient key should be detected.');
+  return { ok: true };
+}
+
 function runAllTests() {
   return {
     ok: true,
@@ -84,6 +110,10 @@ function runAllTests() {
     mutatingGet: testMutatingGetDisabledStatic(),
     traceGate: testTraceGateIncompleteExpense(),
     traceMissingSource: testTraceGateMissingSourceRow(),
+    criticalDqGate: testCriticalValidationBlocksFinalKpi(),
+    invalidAmount: testImportValidationRejectsInvalidAmount(),
+    uploadTypeGuard: testSupportedUploadTypeGuard(),
+    sensitiveRowGuard: testSensitiveRowsDetectedBeforeRawStorage(),
     unknownUser: testUnknownUserDenied(),
     crossTenant: testCrossTenantDenied(),
   };

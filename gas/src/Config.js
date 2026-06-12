@@ -12,6 +12,9 @@ const APP_CONFIG = Object.freeze({
   schemaVersion: 'phase1_v1',
   timezone: 'Asia/Jakarta',
   lockWaitMs: 30000,
+  maxUploadBytes: 5 * 1024 * 1024,
+  maxImportRows: 5000,
+  maxImportSheets: 8,
 });
 
 const PHASE1_FIXTURE = Object.freeze({
