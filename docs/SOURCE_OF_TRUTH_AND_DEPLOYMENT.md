@@ -68,3 +68,12 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
   3. Run setup once so `USER_ACCESS` contains the pilot owner.
   4. Warehouse schema exists and KPI data is available via fixture or import+compute.
 - `WAREHOUSE_SPREADSHEET_ID` Script Property may override the fallback spreadsheet ID in code for staging/pilot separation.
+
+## Current pilot deployment
+
+- Apps Script version: `12`
+- Deployment ID: `AKfycbxtZ6oiag4LoZWgUOss4G8VWdol8W_i88gJKQN-abz4RJgmEXRQKBetXlnA-IoL24U`
+- Web app URL: `https://script.google.com/macros/s/AKfycbxtZ6oiag4LoZWgUOss4G8VWdol8W_i88gJKQN-abz4RJgmEXRQKBetXlnA-IoL24U/exec`
+- Description: `Pilot readiness hardening v12`
+- Public unauthenticated fetch redirects to Google sign-in, confirming the app is not anonymous.
+- `clasp run runAllTests` is currently blocked by Apps Script API permission, so use the web readiness route after signing in: `?action=readiness`.
