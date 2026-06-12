@@ -71,9 +71,15 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
 
 ## Current pilot deployment
 
-No active production/pilot deployment is currently approved for ai-clinic.
+A new versioned deployment was created from the `hadi4us@gmail.com`-authorized clasp user on 2026-06-12.
 
-The previous versioned deployment under `ccc19depok@gmail.com` was undeployed and must not be used. The next deployment must be created from a `hadi4us@gmail.com`-owned Apps Script project and documented here with its version, deployment ID, web app URL, and readiness result.
+- Apps Script ID: `1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy`
+- Version: `13` — `Pilot deployment from hadi4us account 2026-06-12`
+- Deployment ID: `AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag`
+- Web app URL: `https://script.google.com/macros/s/AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag/exec`
+- Readiness status: pending authenticated browser/user verification. Anonymous fetch redirects to Google sign-in, as expected for non-anonymous pilot access.
+
+The previous versioned deployment under `ccc19depok@gmail.com` was undeployed and must not be used.
 
 Before any Google-side action for ai-clinic, run:
 

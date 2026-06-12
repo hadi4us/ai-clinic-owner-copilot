@@ -2,6 +2,7 @@
 set -euo pipefail
 
 REQUIRED_ACCOUNT="${AI_CLINIC_GOOGLE_ACCOUNT:-hadi4us@gmail.com}"
+CLASP_USER="${AI_CLINIC_CLASP_USER:-hadi4us}"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GAS_DIR="$PROJECT_DIR/gas"
 
@@ -10,7 +11,7 @@ if ! command -v npx >/dev/null 2>&1; then
   exit 2
 fi
 
-output="$(cd "$GAS_DIR" && npx clasp show-authorized-user 2>&1 || true)"
+output="$(cd "$GAS_DIR" && npx clasp -u "$CLASP_USER" show-authorized-user 2>&1 || true)"
 echo "$output"
 
 if ! printf '%s\n' "$output" | grep -Fq "You are logged in as $REQUIRED_ACCOUNT."; then
@@ -21,8 +22,7 @@ Do not deploy, push, create versions, or mutate Apps Script/Sheets from another 
 
 Fix:
   cd gas
-  npx clasp logout
-  npx clasp login
+  npx clasp -u "$CLASP_USER" login
 Then authenticate with $REQUIRED_ACCOUNT and rerun this check.
 MSG
   exit 1
