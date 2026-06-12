@@ -1,13 +1,14 @@
 function healthCheck() {
   const spreadsheet = getWarehouseSpreadsheet_();
   const missingSheets = getPocSheetNames_().filter(name => !spreadsheet.getSheetByName(name));
-  return { ok: missingSheets.length === 0, appName: APP_CONFIG.appName, spreadsheetId: APP_CONFIG.spreadsheetId, schemaVersion: APP_CONFIG.schemaVersion, missingSheets, aiEnabled: false, pocScope: ['upload_excel', 'data_warehouse', 'kpi_engine', 'dashboard_revenue', 'dashboard_profit'] };
+  return { ok: missingSheets.length === 0, appName: APP_CONFIG.appName, spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, missingSheets, aiEnabled: false, pocScope: ['upload_excel', 'data_warehouse', 'kpi_engine', 'dashboard_revenue', 'dashboard_profit'] };
 }
 
 function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
   const action = params.action;
   if (action === 'health') return jsonOutput_(healthCheck());
+  if (action === 'readiness') return jsonOutput_(readinessCheck());
   if (action === 'dashboardPayload') {
     const context = resolveRequestContext_(params, {}, 'owner');
     return jsonOutput_(getDashboardPayloadForContext_(context, params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));

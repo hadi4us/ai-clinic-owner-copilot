@@ -22,3 +22,17 @@ const PHASE1_FIXTURE = Object.freeze({
   tenant: ['klinik_001', 'Klinik Sehat Sentosa', 'active', 'Asia/Jakarta', 'IDR'],
   clinic: ['klinik_001', 'clinic_001', 'Klinik Sehat Sentosa', 'pratama', 'active'],
 });
+
+
+function getScriptProperty_(key, fallbackValue) {
+  try {
+    const value = PropertiesService.getScriptProperties().getProperty(key);
+    return value === null || value === undefined || value === '' ? fallbackValue : value;
+  } catch (err) {
+    return fallbackValue;
+  }
+}
+
+function getConfiguredSpreadsheetId_() {
+  return getScriptProperty_('WAREHOUSE_SPREADSHEET_ID', APP_CONFIG.spreadsheetId);
+}

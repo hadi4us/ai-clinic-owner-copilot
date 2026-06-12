@@ -114,6 +114,15 @@ function getFunctionSourceText_(name) {
   try { return String(eval(name)); } catch (err) { return ''; }
 }
 
+
+function testReadinessCheckStatic() {
+  const source = getFunctionSourceText_('readinessCheck');
+  if (source.indexOf('mutation_token_configured') === -1) throw new Error('Readiness check must verify mutation token config.');
+  if (source.indexOf('owner_access_seeded') === -1) throw new Error('Readiness check must verify owner USER_ACCESS seed.');
+  if (source.indexOf('maskId_') === -1) throw new Error('Readiness check must mask spreadsheet id.');
+  return { ok: true };
+}
+
 function runAllTests() {
   return {
     ok: true,
@@ -127,6 +136,7 @@ function runAllTests() {
     uploadTypeGuard: testSupportedUploadTypeGuard(),
     sensitiveRowGuard: testSensitiveRowsDetectedBeforeRawStorage(),
     dashboardCache: testDashboardCacheStatic(),
+    readiness: testReadinessCheckStatic(),
     unknownUser: testUnknownUserDenied(),
     crossTenant: testCrossTenantDenied(),
   };

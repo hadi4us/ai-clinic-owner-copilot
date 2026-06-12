@@ -1,5 +1,5 @@
 function getWarehouseSpreadsheet_() {
-  return SpreadsheetApp.openById(APP_CONFIG.spreadsheetId);
+  return SpreadsheetApp.openById(getConfiguredSpreadsheetId_());
 }
 
 function getOrCreateSheet_(spreadsheet, sheetName) {
@@ -87,7 +87,7 @@ function ensurePhase1WarehouseSheetsNoLock_() {
   getPhase1SheetNames_().forEach(sheetName => setHeader_(getOrCreateSheet_(spreadsheet, sheetName), getSheetSchema_(sheetName)));
   seedPocConfig_();
   writeAudit_('system', 'system', 'setup_final_warehouse_sheets', 'spreadsheet_schema', { schemaVersion: APP_CONFIG.schemaVersion, sheetCount: getPhase1SheetNames_().length });
-  return { ok: true, spreadsheetId: APP_CONFIG.spreadsheetId, schemaVersion: APP_CONFIG.schemaVersion, sheetsCreatedOrUpdated: getPhase1SheetNames_().length };
+  return { ok: true, spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, sheetsCreatedOrUpdated: getPhase1SheetNames_().length };
 }
 
 function setupFinalWarehouseSheets() {

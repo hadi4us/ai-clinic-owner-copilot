@@ -57,3 +57,14 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
 - Dashboard payload is cached per `tenantId:clinicId:period` with `CacheService` for 120 seconds by default.
 - Cache is best-effort; cache failures must not break dashboard rendering.
 - Import, KPI compute, and fixture reset invalidate affected dashboard cache keys after writes.
+
+
+## Pilot readiness check
+
+- Read-only API route: `GET ?action=readiness` returns `READY_FOR_PILOT_SMOKE` or `NOT_READY` with non-secret checks.
+- Required before real use:
+  1. `PILOT_MUTATION_TOKEN` Script Property set.
+  2. `PILOT_OWNER_EMAIL` Script Property set.
+  3. Run setup once so `USER_ACCESS` contains the pilot owner.
+  4. Warehouse schema exists and KPI data is available via fixture or import+compute.
+- `WAREHOUSE_SPREADSHEET_ID` Script Property may override the fallback spreadsheet ID in code for staging/pilot separation.
