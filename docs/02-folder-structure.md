@@ -122,7 +122,7 @@ AI Clinic Owner Copilot/
 
 ```json
 {
-  "scriptId": "1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy",
+  "scriptId": "REPLACE_WITH_HADI4US_OWNED_SCRIPT_ID",  // use a script owned by hadi4us@gmail.com
   "rootDir": "./src"
 }
 ```

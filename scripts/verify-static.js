@@ -95,6 +95,18 @@ assertIncludes('scripts/check-google-account.sh', [
   'ai-clinic Google-side actions must use',
 ]);
 
+
+const oldCccScriptId = '1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy';
+const oldCccSpreadsheetId = '1XujOwLJprl1LjdEWoSAuhDEABsul3__zXQicfFy5bB4';
+for (const file of ['gas/.clasp.json', 'gas/verify/.clasp.json']) {
+  const text = read(file);
+  assert(!text.includes(oldCccScriptId), `${file} must not point to the old ccc19depok Apps Script project`);
+  assert(text.includes('REPLACE_WITH_HADI4US_OWNED_SCRIPT_ID'), `${file} must remain neutralized until hadi4us script ID is available`);
+}
+for (const file of ['gas/src/Config.js', 'src/Core/Config.gs']) {
+  assert(!read(file).includes(oldCccSpreadsheetId), `${file} must not use old ccc19depok spreadsheet fallback`);
+}
+
 const docs = read('docs/SOURCE_OF_TRUTH_AND_DEPLOYMENT.md');
 assert(docs.includes('No active production/pilot deployment is currently approved'), 'Docs must not claim old ccc19depok deployment is current');
 assert(docs.includes('All Google-side resources for this project must use `hadi4us@gmail.com`'), 'Docs must state hadi4us Google account policy');

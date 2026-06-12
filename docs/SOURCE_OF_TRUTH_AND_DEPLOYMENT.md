@@ -67,7 +67,7 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
   2. `PILOT_OWNER_EMAIL` Script Property set.
   3. Run setup once so `USER_ACCESS` contains the pilot owner.
   4. Warehouse schema exists and KPI data is available via fixture or import+compute.
-- `WAREHOUSE_SPREADSHEET_ID` Script Property may override the fallback spreadsheet ID in code for staging/pilot separation.
+- `WAREHOUSE_SPREADSHEET_ID` Script Property is required for pilot deployment. No fallback spreadsheet ID is approved while migrating away from old `ccc19depok@gmail.com` resources.
 
 ## Current pilot deployment
 
@@ -126,8 +126,8 @@ Automation note: attempting to grant Drive permission to `hadi4us@gmail.com` via
    ../scripts/check-google-account.sh
    ```
 2. Create a new Apps Script project from `hadi4us@gmail.com` or clone/copy ownership into a `hadi4us@gmail.com`-owned project.
-3. Update `gas/.clasp.json` and `gas/verify/.clasp.json` with the new script ID.
-4. Ensure the pilot spreadsheet is owned by or shared to `hadi4us@gmail.com`.
+3. Update `gas/.clasp.json` and `gas/verify/.clasp.json` with the new script ID. Tracked `.clasp.json` files are intentionally neutralized with `REPLACE_WITH_HADI4US_OWNED_SCRIPT_ID` until then.
+4. Ensure the pilot spreadsheet is owned by or shared to `hadi4us@gmail.com`; set `WAREHOUSE_SPREADSHEET_ID` because no old ccc19depok spreadsheet fallback is approved.
 5. Set Script Properties on the new Apps Script project:
    - `PILOT_OWNER_EMAIL=hadi4us@gmail.com`
    - `PILOT_MUTATION_TOKEN=<strong random token>`

@@ -2,8 +2,8 @@
 
 ## Current GAS Project
 
-- Spreadsheet ID: `1XujOwLJprl1LjdEWoSAuhDEABsul3__zXQicfFy5bB4`
-- Apps Script ID: `1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy`
+- Spreadsheet ID: set via Script Property `WAREHOUSE_SPREADSHEET_ID` on the `hadi4us@gmail.com`-owned Apps Script project. No ccc19depok-owned fallback is approved.
+- Apps Script ID: `REPLACE_WITH_HADI4US_OWNED_SCRIPT_ID` after creating the new `hadi4us@gmail.com`-owned project.
 - Local clasp root: `gas/src`
 
 ## Implemented Files
@@ -77,7 +77,7 @@ Google Sheets API has not been used in project 1072944905499 before or it is dis
 
 Open Apps Script project and run once manually:
 
-1. Open Apps Script project ID: `1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy`
+1. Open the new `hadi4us@gmail.com`-owned Apps Script project ID from `gas/.clasp.json`
 2. Select function: `setupPhase1Warehouse`
 3. Click Run.
 4. Approve spreadsheet authorization.

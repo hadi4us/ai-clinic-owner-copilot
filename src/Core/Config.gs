@@ -27,7 +27,7 @@ const APP_CONFIG = {
   }),
 
   storage: Object.freeze({
-    spreadsheetId: '1XujOwLJprl1LjdEWoSAuhDEABsul3__zXQicfFy5bB4',
+    spreadsheetId: '',
     cacheTtlSeconds: 300,
   }),
 

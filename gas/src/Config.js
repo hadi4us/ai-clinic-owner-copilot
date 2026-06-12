@@ -5,7 +5,7 @@
  * Phase 1 only: Data Warehouse, KPI Engine, Finance Dashboard foundation.
  */
 const APP_CONFIG = Object.freeze({
-  spreadsheetId: '1XujOwLJprl1LjdEWoSAuhDEABsul3__zXQicfFy5bB4',
+  spreadsheetId: '',
   defaultTenantId: 'klinik_001',
   defaultClinicId: 'clinic_001',
   appName: 'AI Clinic Owner Copilot',
