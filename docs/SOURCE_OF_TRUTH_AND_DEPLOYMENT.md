@@ -130,3 +130,11 @@ Minimum temporary fix, if the old deployment must be inspected first:
 5. Run setup once, then open the new `hadi4us@gmail.com` deployment URL with `?action=readiness`.
 
 Automation note: attempting to grant Drive permission to `hadi4us@gmail.com` via the old clasp token returned `appNotAuthorizedToFile`, so ownership/sharing must be done once through Google UI or by re-authorizing clasp as `hadi4us@gmail.com`.
+
+## Deprecated ccc19depok deployments
+
+On 2026-06-12, all versioned Apps Script deployments under the old `ccc19depok@gmail.com` project were undeployed/deleted, including the previous pilot readiness deployment `AKfycbxtZ6oiag4LoZWgUOss4G8VWdol8W_i88gJKQN-abz4RJgmEXRQKBetXlnA-IoL24U`.
+
+Only the unversioned `@HEAD`/dev deployment ID `AKfycbyUCmgLcXylpATMskojI1rsWhKjsU37kpHSkpfvuFvg` remains because Apps Script reports: `Read-only deployments may not be deleted.` Treat it as deprecated and do not use it for ai-clinic pilot/production.
+
+Next production deployment must be created from a `hadi4us@gmail.com`-owned Apps Script project.
