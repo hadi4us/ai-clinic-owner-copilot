@@ -77,3 +77,24 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
 - Description: `Pilot readiness hardening v12`
 - Public unauthenticated fetch redirects to Google sign-in, confirming the app is not anonymous.
 - `clasp run runAllTests` is currently blocked by Apps Script API permission, so use the web readiness route after signing in: `?action=readiness`.
+
+## Known access issue: pilot URL shows "Anda memerlukan akses"
+
+If a signed-in pilot user (for example `hadi4us@gmail.com`) sees Google Drive "Anda memerlukan akses" when opening the web app URL, the Apps Script project/deployment is not shared or accessible to that Google account yet.
+
+Current clasp account/deployer observed by CLI: `ccc19depok@gmail.com`.
+
+Fix from the owner/deployer Google account:
+
+1. Open the Apps Script project:
+   `https://script.google.com/d/1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy/edit`
+2. Share the project with `hadi4us@gmail.com` at least as Editor while preparing pilot access.
+3. In Project Settings > Script Properties, set:
+   - `PILOT_OWNER_EMAIL=hadi4us@gmail.com`
+   - `PILOT_MUTATION_TOKEN=<strong random token>`
+   - optional: `WAREHOUSE_SPREADSHEET_ID=<pilot spreadsheet id>`
+4. Deploy > Manage deployments > verify the versioned deployment uses access "Anyone with Google account" / manifest `webapp.access: ANYONE`.
+5. Open after sign-in:
+   `https://script.google.com/macros/s/AKfycbxtZ6oiag4LoZWgUOss4G8VWdol8W_i88gJKQN-abz4RJgmEXRQKBetXlnA-IoL24U/exec?action=readiness`
+
+Automation note: attempting to grant Drive permission via the current clasp token returned `appNotAuthorizedToFile`, so sharing must be performed once from the owner/deployer Google UI or by re-authorizing clasp with Drive write permission.
