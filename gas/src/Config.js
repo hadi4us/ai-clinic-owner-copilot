@@ -15,6 +15,7 @@ const APP_CONFIG = Object.freeze({
   maxUploadBytes: 5 * 1024 * 1024,
   maxImportRows: 5000,
   maxImportSheets: 8,
+  dashboardCacheTtlSeconds: 120,
 });
 
 const PHASE1_FIXTURE = Object.freeze({

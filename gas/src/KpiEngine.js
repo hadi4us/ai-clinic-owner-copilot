@@ -65,6 +65,7 @@ function computePocKpisNoLock_(tenantId, clinicId, period) {
   });
   computePocDailyKpis_(tenantId, clinicId, period, revenues, prescriptions, procedures, expenses, visits, bpjsClaims, inventory, taxes, traceStatus, dataStatus);
   writePocAlerts_(tenantId, clinicId, period, { totalRevenue, totalCost, netProfit, profitMargin, dataStatus, traceStatus, expenseRows: expenses.length, criticalIssues });
+  invalidateDashboardCache_(tenantId, clinicId, period);
   return { tenantId, clinicId, period, totalVisits: visits.length, totalRevenue, totalCost, grossProfit, netProfit, profitMargin, dataStatus, traceStatus, dataQualityWarnings: criticalIssues.length };
 }
 

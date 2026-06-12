@@ -69,6 +69,8 @@ function resetPocFixtureDataForContext_(context) {
     ensurePhase1WarehouseSheetsNoLock_();
     ['IMPORT_BATCH', 'IMPORT_FILE', 'VALIDATION_LOG', 'RAW_IMPORT', 'KUNJUNGAN', 'TINDAKAN', 'RESEP', 'PENDAPATAN', 'BIAYA', 'KPI_HARIAN', 'KPI_BULANAN', 'ALERT_LOG', 'SYNC_LOG'].forEach(clearSheetDataByName_);
     seedPocFixtureData_();
-    return computePocKpisNoLock_(context.tenantId, context.clinicId, '2026-06');
+    const result = computePocKpisNoLock_(context.tenantId, context.clinicId, '2026-06');
+    invalidateDashboardCache_(context.tenantId, context.clinicId, '2026-06');
+    return result;
   });
 }

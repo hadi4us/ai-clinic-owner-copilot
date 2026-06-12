@@ -102,6 +102,18 @@ function testSensitiveRowsDetectedBeforeRawStorage() {
   return { ok: true };
 }
 
+
+function testDashboardCacheStatic() {
+  const source = getFunctionSourceText_('getDashboardPayloadForContext_') + getFunctionSourceText_('invalidateDashboardCache_');
+  if (source.indexOf('CacheService.getScriptCache') === -1) throw new Error('Dashboard payload cache must use CacheService.');
+  if (source.indexOf('cache.removeAll') === -1) throw new Error('Dashboard cache invalidation must remove cached keys.');
+  return { ok: true };
+}
+
+function getFunctionSourceText_(name) {
+  try { return String(eval(name)); } catch (err) { return ''; }
+}
+
 function runAllTests() {
   return {
     ok: true,
@@ -114,6 +126,7 @@ function runAllTests() {
     invalidAmount: testImportValidationRejectsInvalidAmount(),
     uploadTypeGuard: testSupportedUploadTypeGuard(),
     sensitiveRowGuard: testSensitiveRowsDetectedBeforeRawStorage(),
+    dashboardCache: testDashboardCacheStatic(),
     unknownUser: testUnknownUserDenied(),
     crossTenant: testCrossTenantDenied(),
   };

@@ -50,3 +50,10 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
 - Duplicate rows inside one file are skipped and written to `VALIDATION_LOG` as `duplicate_source_row`.
 - Sensitive patient columns are blocked before `RAW_IMPORT` storage; rejected PHI rows are not persisted raw.
 - Critical import validation errors (`severity=error`, unresolved) mark KPI `data_status=incomplete` and are shown in dashboard Data Quality.
+
+
+## Dashboard payload cache
+
+- Dashboard payload is cached per `tenantId:clinicId:period` with `CacheService` for 120 seconds by default.
+- Cache is best-effort; cache failures must not break dashboard rendering.
+- Import, KPI compute, and fixture reset invalidate affected dashboard cache keys after writes.

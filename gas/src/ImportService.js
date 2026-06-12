@@ -88,6 +88,7 @@ function importUploadedBlob_(blob, options) {
   const dataStatus = result.rowsFailed > 0 ? 'partial' : 'complete';
   finalizeImportMetadata_(tenantId, clinicId, importId, importStatus, dataStatus, result.rowsRead, period, fileChecksum);
   const kpi = computePocKpisNoLock_(tenantId, clinicId, period);
+  invalidateDashboardCache_(tenantId, clinicId, period);
   appendSyncLog_(tenantId, clinicId, importId, 'import', sourceSystem, importStatus === 'failed' ? 'failed' : 'success', now, new Date(), result.rowsRead, result.rowsWritten, result.rowsFailed, result.rowsFailed > 0 ? 'Import completed with validation failures. See VALIDATION_LOG.' : '');
   writeAudit_(opts.actorId || 'dashboard_upload', 'owner', 'upload_poc_file', 'IMPORT_BATCH', { importId, fileName, rowsWritten: result.rowsWritten, rowsFailed: result.rowsFailed, period });
   return Object.assign({ ok: importStatus !== 'failed', importId, period, kpi, importStatus, dataStatus }, result);

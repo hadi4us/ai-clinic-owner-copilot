@@ -23,6 +23,7 @@ const APP_CONFIG = {
     maxUploadBytes: 5 * 1024 * 1024,
     maxImportRows: 5000,
     maxImportSheets: 8,
+    dashboardCacheTtlSeconds: 120,
   }),
 
   storage: Object.freeze({
@@ -73,6 +74,7 @@ APP_CONFIG.lockWaitMs = APP_CONFIG.runtime.lockWaitMs;
 APP_CONFIG.maxUploadBytes = APP_CONFIG.runtime.maxUploadBytes;
 APP_CONFIG.maxImportRows = APP_CONFIG.runtime.maxImportRows;
 APP_CONFIG.maxImportSheets = APP_CONFIG.runtime.maxImportSheets;
+APP_CONFIG.dashboardCacheTtlSeconds = APP_CONFIG.runtime.dashboardCacheTtlSeconds;
 Object.freeze(APP_CONFIG);
 
 const PHASE1_FIXTURE = Object.freeze({
