@@ -11,6 +11,7 @@ const APP_CONFIG = Object.freeze({
   appName: 'AI Clinic Owner Copilot',
   schemaVersion: 'phase1_v1',
   timezone: 'Asia/Jakarta',
+  lockWaitMs: 30000,
 });
 
 const PHASE1_FIXTURE = Object.freeze({

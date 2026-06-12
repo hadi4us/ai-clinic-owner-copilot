@@ -26,8 +26,10 @@ function seedPocConfig_() {
 }
 
 function resetPocFixtureData() {
-  setupFinalWarehouseSheets();
-  ['IMPORT_BATCH', 'IMPORT_FILE', 'VALIDATION_LOG', 'RAW_IMPORT', 'KUNJUNGAN', 'TINDAKAN', 'RESEP', 'PENDAPATAN', 'BIAYA', 'KPI_HARIAN', 'KPI_BULANAN', 'ALERT_LOG', 'SYNC_LOG'].forEach(clearSheetDataByName_);
-  seedPocFixtureData_();
-  return computePocKpis(APP_CONFIG.defaultTenantId, APP_CONFIG.defaultClinicId, '2026-06');
+  return withTenantClinicLock_('reset_poc_fixture_data', APP_CONFIG.defaultTenantId, APP_CONFIG.defaultClinicId, function() {
+    ensurePhase1WarehouseSheetsNoLock_();
+    ['IMPORT_BATCH', 'IMPORT_FILE', 'VALIDATION_LOG', 'RAW_IMPORT', 'KUNJUNGAN', 'TINDAKAN', 'RESEP', 'PENDAPATAN', 'BIAYA', 'KPI_HARIAN', 'KPI_BULANAN', 'ALERT_LOG', 'SYNC_LOG'].forEach(clearSheetDataByName_);
+    seedPocFixtureData_();
+    return computePocKpisNoLock_(APP_CONFIG.defaultTenantId, APP_CONFIG.defaultClinicId, '2026-06');
+  });
 }

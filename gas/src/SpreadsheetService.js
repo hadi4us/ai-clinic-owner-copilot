@@ -53,6 +53,22 @@ function replaceObjects_(sheetName, objects) {
   return appendObjects_(sheetName, objects || []);
 }
 
+function withDocumentLock_(operationName, callback) {
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(APP_CONFIG.lockWaitMs || 30000)) {
+    throw new Error(`Sistem sedang memproses data lain (${operationName}). Coba lagi sebentar lagi.`);
+  }
+  try {
+    return callback();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function withTenantClinicLock_(operationName, tenantId, clinicId, callback) {
+  return withDocumentLock_(`${operationName}:${tenantId || 'unknown'}:${clinicId || 'unknown'}`, callback);
+}
+
 function getRowsAsObjects_(sheetName) {
   const sheet = getWarehouseSpreadsheet_().getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() < 2) return [];
@@ -66,10 +82,16 @@ function getRowsAsObjects_(sheetName) {
     }, {}));
 }
 
-function setupFinalWarehouseSheets() {
+function ensurePhase1WarehouseSheetsNoLock_() {
   const spreadsheet = getWarehouseSpreadsheet_();
   getPhase1SheetNames_().forEach(sheetName => setHeader_(getOrCreateSheet_(spreadsheet, sheetName), getSheetSchema_(sheetName)));
   seedPocConfig_();
   writeAudit_('system', 'system', 'setup_final_warehouse_sheets', 'spreadsheet_schema', { schemaVersion: APP_CONFIG.schemaVersion, sheetCount: getPhase1SheetNames_().length });
   return { ok: true, spreadsheetId: APP_CONFIG.spreadsheetId, schemaVersion: APP_CONFIG.schemaVersion, sheetsCreatedOrUpdated: getPhase1SheetNames_().length };
+}
+
+function setupFinalWarehouseSheets() {
+  return withDocumentLock_('setup_final_warehouse_sheets', function() {
+    return ensurePhase1WarehouseSheetsNoLock_();
+  });
 }

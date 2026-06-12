@@ -1,6 +1,12 @@
 function computePocKpis(tenantId, clinicId, period) {
   assertTenantScope_(tenantId, clinicId);
-  setupFinalWarehouseSheets();
+  return withTenantClinicLock_('compute_poc_kpis', tenantId, clinicId, function() {
+    return computePocKpisNoLock_(tenantId, clinicId, period);
+  });
+}
+
+function computePocKpisNoLock_(tenantId, clinicId, period) {
+  ensurePhase1WarehouseSheetsNoLock_();
   const now = new Date();
   const visits = getRowsAsObjects_('KUNJUNGAN').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.visit_date, period) && String(r.status || 'completed') !== 'cancelled');
   const revenues = getRowsAsObjects_('PENDAPATAN').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.transaction_date, period) && ['cancel', 'refund'].indexOf(String(r.status || '').toLowerCase()) === -1);

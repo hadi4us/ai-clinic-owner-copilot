@@ -12,13 +12,14 @@ function uploadPocFile(base64Data, fileName, mimeType, options) {
 }
 
 function importUploadedBlob_(blob, options) {
-  setupFinalWarehouseSheets();
   const opts = options || {};
   const fileName = blob.getName() || 'upload';
   const lowerName = fileName.toLowerCase();
   const importId = opts.importId || `imp_${Utilities.getUuid().replace(/-/g, '').slice(0, 12)}`;
   const tenantId = opts.tenantId || APP_CONFIG.defaultTenantId;
   const clinicId = opts.clinicId || APP_CONFIG.defaultClinicId;
+  return withTenantClinicLock_('import_uploaded_blob', tenantId, clinicId, function() {
+  ensurePhase1WarehouseSheetsNoLock_();
   const sourceSystem = opts.sourceSystem || 'generic_excel';
   const now = new Date();
 
@@ -61,7 +62,7 @@ function importUploadedBlob_(blob, options) {
   }
 
   const period = opts.period || inferImportPeriod_(result) || toPeriodString_(new Date());
-  const kpi = computePocKpis(tenantId, clinicId, period);
+  const kpi = computePocKpisNoLock_(tenantId, clinicId, period);
   appendObjects_('SYNC_LOG', [{
     tenant_id: tenantId,
     clinic_id: clinicId,
@@ -79,6 +80,7 @@ function importUploadedBlob_(blob, options) {
   }]);
   writeAudit_('dashboard_upload', 'owner', 'upload_poc_file', 'IMPORT_BATCH', { importId, fileName, rowsWritten: result.rowsWritten, period });
   return Object.assign({ ok: true, importId, period, kpi }, result);
+  });
 }
 
 function importCsvBlob_(blob, importId, tenantId, clinicId, options) {

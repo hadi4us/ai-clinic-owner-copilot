@@ -19,6 +19,7 @@ const APP_CONFIG = {
     currency: 'IDR',
     dateFormat: 'yyyy-MM-dd',
     monthFormat: 'yyyy-MM',
+    lockWaitMs: 30000,
   }),
 
   storage: Object.freeze({
@@ -63,7 +64,9 @@ APP_CONFIG.defaultTenantId = APP_CONFIG.tenancy.defaultTenantId;
 APP_CONFIG.defaultClinicId = APP_CONFIG.tenancy.defaultClinicId;
 APP_CONFIG.spreadsheetId = APP_CONFIG.storage.spreadsheetId;
 APP_CONFIG.schemaVersion = APP_CONFIG.app.schemaVersion;
+APP_CONFIG.appName = APP_CONFIG.app.name;
 APP_CONFIG.timezone = APP_CONFIG.runtime.timezone;
+APP_CONFIG.lockWaitMs = APP_CONFIG.runtime.lockWaitMs;
 Object.freeze(APP_CONFIG);
 
 const PHASE1_FIXTURE = Object.freeze({
