@@ -53,6 +53,16 @@ function replaceObjects_(sheetName, objects) {
   return appendObjects_(sheetName, objects || []);
 }
 
+function replaceObjectsWhere_(sheetName, predicate, replacementObjects) {
+  const keptRows = getRowsAsObjects_(sheetName).filter(row => !predicate(row));
+  return replaceObjects_(sheetName, keptRows.concat(replacementObjects || []));
+}
+
+function updateObjectsWhere_(sheetName, predicate, updater) {
+  const rows = getRowsAsObjects_(sheetName).map(row => predicate(row) ? updater(Object.assign({}, row)) : row);
+  return replaceObjects_(sheetName, rows);
+}
+
 function withDocumentLock_(operationName, callback) {
   const lock = LockService.getDocumentLock();
   if (!lock.tryLock(APP_CONFIG.lockWaitMs || 30000)) {

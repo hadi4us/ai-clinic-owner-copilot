@@ -74,13 +74,13 @@ function computePhase1Metrics(tenantId, clinicId, period) {
 }
 
 function upsertKpiBulanan_(tenantId, clinicId, period, metrics) {
-  const rows = getRowsAsObjects_('KPI_BULANAN').filter(r => !(r.tenant_id === tenantId && r.clinic_id === clinicId && r.period === period));
-  rows.push(Object.assign({ tenant_id: tenantId, clinic_id: clinicId, period }, metrics));
-  replaceObjects_('KPI_BULANAN', rows);
+  replaceObjectsWhere_('KPI_BULANAN', function(row) {
+    return row.tenant_id === tenantId && row.clinic_id === clinicId && row.period === period;
+  }, [Object.assign({ tenant_id: tenantId, clinic_id: clinicId, period }, metrics)]);
 }
 
 function computePocDailyKpis_(tenantId, clinicId, period, revenues, prescriptions, procedures, expenses, visits, bpjsClaims, inventory, taxes, traceStatus, dataStatus) {
-  const existingRows = getRowsAsObjects_('KPI_HARIAN').filter(r => !(r.tenant_id === tenantId && r.clinic_id === clinicId && toPeriodString_(r.kpi_date) === period));
+  const existingRows = [];
   const dates = {};
   revenues.forEach(r => dates[toIsoDateString_(r.transaction_date)] = true);
   expenses.forEach(r => dates[toIsoDateString_(r.expense_date)] = true);
@@ -119,7 +119,9 @@ function computePocDailyKpis_(tenantId, clinicId, period, revenues, prescription
       computed_at: new Date(),
     };
   });
-  replaceObjects_('KPI_HARIAN', existingRows.concat(dailyRows));
+  replaceObjectsWhere_('KPI_HARIAN', function(row) {
+    return row.tenant_id === tenantId && row.clinic_id === clinicId && toPeriodString_(row.kpi_date) === period;
+  }, dailyRows);
 }
 
 function getFinanceSummary(tenantId, clinicId, period) {
@@ -191,13 +193,14 @@ function getFinanceTrustLabel_(dataStatus, traceStatus) {
 }
 
 function writePocAlerts_(tenantId, clinicId, period, metrics) {
-  const existing = getRowsAsObjects_('ALERT_LOG').filter(r => !(r.tenant_id === tenantId && r.clinic_id === clinicId && String(r.kpi_ref || '').indexOf(period) !== -1));
   const rows = [];
   if (metrics.totalRevenue === 0) rows.push(makeAlert_(tenantId, clinicId, 'finance', 'critical', 'Revenue belum ada', 'Data revenue belum tersedia untuk periode ini.', `total_revenue:${period}`));
   if (metrics.expenseRows === 0) rows.push(makeAlert_(tenantId, clinicId, 'finance', 'warning', 'Biaya belum lengkap', 'Data biaya belum tersedia. Profit ditandai estimated.', `total_cost:${period}`));
   if (metrics.netProfit < 0) rows.push(makeAlert_(tenantId, clinicId, 'finance', 'high', 'Profit negatif', 'Net profit periode ini negatif. Cek revenue dan biaya terbesar.', `net_profit:${period}`));
   if (metrics.criticalIssues && metrics.criticalIssues.length) rows.push(makeAlert_(tenantId, clinicId, 'data_quality', 'critical', 'Data quality blocking', `${metrics.criticalIssues.length} error validasi masih open. Angka finance ditandai incomplete.`, `data_quality:${period}`));
-  replaceObjects_('ALERT_LOG', existing.concat(rows));
+  replaceObjectsWhere_('ALERT_LOG', function(row) {
+    return row.tenant_id === tenantId && row.clinic_id === clinicId && String(row.kpi_ref || '').indexOf(period) !== -1;
+  }, rows);
 }
 
 function makeAlert_(tenantId, clinicId, alertType, severity, title, message, kpiRef) {

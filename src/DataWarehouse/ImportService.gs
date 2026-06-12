@@ -337,26 +337,21 @@ function findCompletedImportByChecksum_(tenantId, clinicId, checksum) {
 }
 
 function finalizeImportMetadata_(tenantId, clinicId, importId, importStatus, dataStatus, rowCount, period, checksum) {
-  const batches = getRowsAsObjects_('IMPORT_BATCH').map(row => {
-    if (row.tenant_id === tenantId && row.clinic_id === clinicId && row.import_id === importId) {
-      row.status = importStatus;
-      row.data_status = dataStatus;
-      row.period_start = period ? period + '-01' : row.period_start;
-      row.period_end = period ? period + '-31' : row.period_end;
-      row.completed_at = new Date();
-    }
+  const matchesImport = function(row) { return row.tenant_id === tenantId && row.clinic_id === clinicId && row.import_id === importId; };
+  updateObjectsWhere_('IMPORT_BATCH', matchesImport, function(row) {
+    row.status = importStatus;
+    row.data_status = dataStatus;
+    row.period_start = period ? period + '-01' : row.period_start;
+    row.period_end = period ? period + '-31' : row.period_end;
+    row.completed_at = new Date();
     return row;
   });
-  replaceObjects_('IMPORT_BATCH', batches);
-  const files = getRowsAsObjects_('IMPORT_FILE').map(row => {
-    if (row.tenant_id === tenantId && row.clinic_id === clinicId && row.import_id === importId) {
-      row.checksum = checksum || row.checksum;
-      row.row_count = rowCount;
-      row.status = importStatus === 'completed' || importStatus === 'partial' ? 'completed' : 'failed';
-    }
+  updateObjectsWhere_('IMPORT_FILE', matchesImport, function(row) {
+    row.checksum = checksum || row.checksum;
+    row.row_count = rowCount;
+    row.status = importStatus === 'completed' || importStatus === 'partial' ? 'completed' : 'failed';
     return row;
   });
-  replaceObjects_('IMPORT_FILE', files);
 }
 
 function appendSyncLog_(tenantId, clinicId, importId, jobType, sourceSystem, status, startedAt, finishedAt, rowsRead, rowsWritten, rowsFailed, errorMessage) {

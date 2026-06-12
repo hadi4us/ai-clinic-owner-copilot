@@ -46,9 +46,12 @@ assertIncludes('gas/src/SpreadsheetService.js', [
   'LockService.getDocumentLock()',
   'tryLock(APP_CONFIG.lockWaitMs || 30000)',
   'getConfiguredSpreadsheetId_()',
+  'replaceObjectsWhere_',
+  'updateObjectsWhere_',
 ]);
 
 assertIncludes('gas/src/ImportService.js', [
+  'updateObjectsWhere_',
   'validateUploadBlob_',
   'maxImportRows',
   'maxImportSheets',
@@ -59,6 +62,7 @@ assertIncludes('gas/src/ImportService.js', [
 ]);
 
 assertIncludes('gas/src/KpiEngine.js', [
+  'replaceObjectsWhere_',
   'hasRequiredFinanceTrace_',
   'getOpenCriticalValidationIssues_',
   'Data quality blocking',

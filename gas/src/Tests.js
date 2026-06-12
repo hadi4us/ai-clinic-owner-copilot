@@ -123,6 +123,17 @@ function testReadinessCheckStatic() {
   return { ok: true };
 }
 
+
+function testScopedRewriteHelpersStatic() {
+  const helperSource = getFunctionSourceText_('replaceObjectsWhere_') + getFunctionSourceText_('updateObjectsWhere_');
+  if (helperSource.indexOf('predicate(row)') === -1) throw new Error('Scoped rewrite helpers must filter/update by predicate.');
+  const kpiSource = getFunctionSourceText_('upsertKpiBulanan_') + getFunctionSourceText_('computePocDailyKpis_') + getFunctionSourceText_('writePocAlerts_');
+  if (kpiSource.indexOf('replaceObjectsWhere_') === -1) throw new Error('KPI hot writes must use scoped rewrite helper.');
+  const importSource = getFunctionSourceText_('finalizeImportMetadata_');
+  if (importSource.indexOf('updateObjectsWhere_') === -1) throw new Error('Import metadata finalization must use scoped update helper.');
+  return { ok: true };
+}
+
 function runAllTests() {
   return {
     ok: true,
@@ -137,6 +148,7 @@ function runAllTests() {
     sensitiveRowGuard: testSensitiveRowsDetectedBeforeRawStorage(),
     dashboardCache: testDashboardCacheStatic(),
     readiness: testReadinessCheckStatic(),
+    scopedRewriteHelpers: testScopedRewriteHelpersStatic(),
     unknownUser: testUnknownUserDenied(),
     crossTenant: testCrossTenantDenied(),
   };
