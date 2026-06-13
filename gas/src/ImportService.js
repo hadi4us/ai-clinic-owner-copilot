@@ -205,11 +205,11 @@ function mapGenericRowToFinalSheet_(targetSheet, row, importId, tenantId, clinic
   if (targetSheet === 'KUNJUNGAN') return {
     tenant_id: tenantId, clinic_id: clinicId, visit_id: getFirst_(src, ['visit_id', 'id_kunjungan']) || `visit_${importId}_${index + 1}`,
     source_visit_id: getFirst_(src, ['source_visit_id', 'visit_id', 'id_kunjungan']) || '', import_id: importId, source_row_id: sourceRowId,
-    visit_date: toIsoDateString_(getFirst_(src, ['visit_date', 'tanggal', 'tanggal_kunjungan', 'transaction_date'])), registration_time: '',
-    patient_ref: getFirst_(src, ['patient_ref', 'pasien_ref', 'kode_pasien_anonim']) || '', patient_type: getFirst_(src, ['patient_type', 'jenis_pasien']) || '', payer_type: getFirst_(src, ['payer_type', 'penjamin', 'jenis_pasienpenjamin']) || '',
+    visit_date: toIsoDateString_(getFirst_(src, ['visit_date', 'tanggal', 'tanggal_kunjungan', 'transaction_date'])), registration_time: getFirst_(src, ['registration_time', 'jam_registrasi']) || '',
+    patient_ref: getFirst_(src, ['patient_ref', 'pasien_ref', 'kode_pasien_anonim']) || '', patient_type: getFirst_(src, ['patient_type', 'jenis_pasien', 'status_pasien']) || '', payer_type: getFirst_(src, ['payer_type', 'penjamin', 'jenis_pasienpenjamin']) || '',
     doctor_id: normalizeDoctorId_(getFirst_(src, ['doctor_id', 'dokter', 'nama_dokter'])), poli_id: normalizePoliId_(getFirst_(src, ['poli_id', 'poli', 'nama_poli'])),
-    service_category: getFirst_(src, ['service_category', 'kategori_layanan']) || '', service_name: getFirst_(src, ['service_name', 'layanan', 'nama_layanan']) || '',
-    status: getFirst_(src, ['status']) || 'completed', data_status: 'complete', created_at: now, updated_at: now,
+    service_category: getFirst_(src, ['service_category', 'kategori_layanan', 'tipe_kunjungan']) || '', service_name: getFirst_(src, ['service_name', 'layanan', 'nama_layanan', 'tujuan_kunjunganlayanan_administratif', 'tujuan_kunjungan']) || '',
+    status: getFirst_(src, ['status', 'status_kunjungan']) || 'completed', data_status: getFirst_(src, ['data_status', 'status_data']) || 'complete', created_at: now, updated_at: now,
   };
   if (targetSheet === 'TINDAKAN') return {
     tenant_id: tenantId, clinic_id: clinicId, procedure_id: getFirst_(src, ['procedure_id', 'tindakan_id']) || `proc_${importId}_${index + 1}`,
@@ -233,6 +233,19 @@ function mapGenericRowToFinalSheet_(targetSheet, row, importId, tenantId, clinic
     expense_category: getFirst_(src, ['expense_category', 'kategori_biaya', 'kategori']) || 'operasional', expense_name: getFirst_(src, ['expense_name', 'nama_biaya', 'keterangan', 'item_name', 'nama_biayaketerangan']) || 'Biaya',
     account_id: getFirst_(src, ['account_id', 'coa']) || '', amount: asNumber_(getFirst_(src, ['amount', 'nilai', 'nominal']), 0), payment_method: getFirst_(src, ['payment_method', 'metode_bayar']) || '', vendor_name: getFirst_(src, ['vendor_name', 'vendor', 'supplier', 'vendorsupplier']) || '', related_visit_id: getFirst_(src, ['related_visit_id', 'visit_id']) || '', related_item_code: getFirst_(src, ['related_item_code', 'item_code']) || '', cost_type: getFirst_(src, ['cost_type', 'jenis_biaya']) || 'operational', allocation_target: getFirst_(src, ['allocation_target', 'alokasi']) || 'clinic', allocation_id: getFirst_(src, ['allocation_id']) || clinicId, status: 'paid', trace_status: 'traceable', created_at: now,
   };
+  if (targetSheet === 'PAJAK') {
+    const period = String(getFirst_(src, ['tax_period', 'masa_pajak', 'periode']) || '').slice(0, 7) || toPeriodString_(getFirst_(src, ['tanggal', 'date'])) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM');
+    const payable = asNumber_(getFirst_(src, ['tax_payable', 'pajak_terutang', 'amount', 'nilai']), 0);
+    const paid = asNumber_(getFirst_(src, ['tax_paid', 'pajak_dibayar']), 0);
+    return {
+      tenant_id: tenantId, clinic_id: clinicId, tax_id: getFirst_(src, ['tax_id', 'id_pajak']) || `tax_${importId}_${index + 1}`,
+      import_id: importId, tax_period: period, tax_type: getFirst_(src, ['tax_type', 'jenis_pajak']) || 'Pajak manual',
+      taxable_revenue: asNumber_(getFirst_(src, ['taxable_revenue', 'omzet_kena_pajak']), 0), non_taxable_revenue: asNumber_(getFirst_(src, ['non_taxable_revenue', 'omzet_tidak_kena_pajak']), 0),
+      tax_base_amount: asNumber_(getFirst_(src, ['tax_base_amount', 'dppdasar_pengenaan_pajak', 'dpp']), 0), tax_rate: asNumber_(getFirst_(src, ['tax_rate', 'tarif_pajak']), 0),
+      tax_payable: payable, tax_paid: paid, tax_outstanding: Math.max(0, payable - paid), document_status: getFirst_(src, ['document_status', 'status_dokumen']) || 'draft',
+      risk_flag: getFirst_(src, ['risk_flag']) || 'review_required', reconciliation_gap: asNumber_(getFirst_(src, ['reconciliation_gap']), 0), notes: getFirst_(src, ['notes', 'catatan_pajak', 'catatan']) || '', created_at: now, updated_at: now,
+    };
+  }
   return {
     tenant_id: tenantId, clinic_id: clinicId, revenue_id: getFirst_(src, ['revenue_id', 'pendapatan_id']) || `rev_${importId}_${index + 1}`,
     transaction_id: getFirst_(src, ['transaction_id', 'invoice', 'no_transaksi']) || `trx_${importId}_${index + 1}`,
@@ -257,6 +270,7 @@ function getFirst_(row, keys) {
 
 function detectTargetSheetFromHeaders_(headers) {
   const keys = (headers || []).map(normalizeHeaderKey_).join('|');
+  if (keys.indexOf('pajak') !== -1 || keys.indexOf('tax') !== -1 || keys.indexOf('masa_pajak') !== -1) return 'PAJAK';
   if (keys.indexOf('expense') !== -1 || keys.indexOf('biaya') !== -1 || keys.indexOf('nominal') !== -1) return 'BIAYA';
   if (keys.indexOf('prescription') !== -1 || keys.indexOf('resep') !== -1 || keys.indexOf('obat') !== -1) return 'RESEP';
   if (keys.indexOf('procedure') !== -1 || keys.indexOf('tindakan') !== -1) return 'TINDAKAN';
@@ -272,6 +286,7 @@ function validateFinalRow_(targetSheet, row, rowNumber) {
     RESEP: ['tenant_id', 'clinic_id', 'prescription_id', 'prescription_date', 'item_name', 'net_amount'],
     PENDAPATAN: ['tenant_id', 'clinic_id', 'revenue_id', 'transaction_id', 'transaction_date', 'net_amount'],
     BIAYA: ['tenant_id', 'clinic_id', 'expense_id', 'expense_date', 'expense_category', 'amount'],
+    PAJAK: ['tenant_id', 'clinic_id', 'tax_id', 'tax_period', 'tax_type', 'tax_payable'],
   }[targetSheet] || ['tenant_id', 'clinic_id'];
   const errors = [];
   required.forEach(field => {

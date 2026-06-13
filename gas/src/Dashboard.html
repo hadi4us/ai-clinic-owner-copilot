@@ -221,10 +221,21 @@
         ['Dokter/Poli','Boleh isi kode atau nama pendek, contoh dr_001 / umum.'],
         ['Penjamin','Contoh: umum, bpjs, asuransi, perusahaan.'],
         ['Metode Bayar','Contoh: cash, transfer, qris, debit, bpjs.'],
+        ['Kunjungan vs Pendapatan','Kunjungan adalah registrasi/encounter tanpa nominal. Pendapatan adalah transaksi uang/tagihan.'],
+        ['Pajak','Sheet PAJAK opsional untuk rekap kewajiban pajak. Finalisasi tetap perlu validasi konsultan pajak/akuntan.'],
         ['Upload','Setelah diisi, upload file ini di menu Upload Data lalu klik Upload & Hitung.']
       ];
       const sheets=[
         {name:'PETUNJUK', rows:instructionRows, widths:[24,95], freeze:false},
+        {name:'REFERENSI', widths:[24,34,70], rows:[
+          ['Jenis','Nilai yang Disarankan','Catatan'],
+          ['Jenis Pendapatan','konsultasi, tindakan, obat, laboratorium, administrasi, lainnya','Boleh ditambah sesuai kebutuhan klinik.'],
+          ['Kategori Biaya','gaji, sewa, obat_bmhp, utilitas, marketing, maintenance, administrasi, operasional','Gunakan konsisten tiap bulan.'],
+          ['Tipe Kunjungan','rawat_jalan, kontrol, screening, kia, gigi, administrasi','Tidak berisi nominal.'],
+          ['Status Kunjungan','registered, waiting, in_service, completed, cancelled','Untuk tracking operasional layanan.'],
+          ['Status Pasien','baru, lama, kontrol','Jangan isi nama pasien/NIK/no HP.'],
+          ['Jenis Pajak','PPh Final UMKM, PPh 21, PPh 23, PPN Keluaran, PPN Masukan, Pajak Daerah','Opsional untuk rekap manajemen.']
+        ], freeze:false},
         {name:'PENDAPATAN', widths:[18,20,28,10,16,18,14,18,16,16,18,18,18,14], rows:[
           ['Tanggal Transaksi','Jenis Pendapatan','Nama Layanan/Item','Jumlah','Harga Satuan','Pendapatan Kotor','Diskon','Pendapatan Bersih','Terbayar','Piutang','Metode Bayar','Jenis Pasien/Penjamin','Dokter','Poli'],
           ['2026-06-01','tindakan','Konsultasi Dokter',10,150000,1500000,0,1500000,1500000,0,'cash','umum','dr_001','umum']
@@ -233,9 +244,9 @@
           ['Tanggal Biaya','Kategori Biaya','Nama Biaya/Keterangan','Nominal','Metode Bayar','Vendor/Supplier','Jenis Biaya'],
           ['2026-06-01','operasional','Gaji staff',5000000,'transfer','','operational']
         ]},
-        {name:'KUNJUNGAN', widths:[18,22,18,18,16,14,22,28,16], rows:[
-          ['Tanggal Kunjungan','Kode Pasien Anonim','Jenis Pasien','Penjamin','Dokter','Poli','Kategori Layanan','Nama Layanan','Status'],
-          ['2026-06-01','anon_001','umum','umum','dr_001','umum','rawat_jalan','Konsultasi','completed']
+        {name:'KUNJUNGAN', widths:[18,16,20,18,22,18,18,14,22,34,18], rows:[
+          ['Tanggal Kunjungan','Jam Registrasi','Tipe Kunjungan','Status Kunjungan','Kode Pasien Anonim','Status Pasien','Penjamin','Dokter','Poli','Tujuan Kunjungan/Layanan Administratif','Status Data'],
+          ['2026-06-01','08:30','rawat_jalan','completed','anon_001','baru','umum','dr_001','umum','Registrasi rawat jalan','complete']
         ]},
         {name:'TINDAKAN', widths:[18,28,22,10,16,18,14,18,16,14], rows:[
           ['Tanggal Tindakan','Nama Tindakan','Kategori Tindakan','Jumlah','Harga Satuan','Pendapatan Kotor','Diskon','Pendapatan Bersih','Dokter','Poli'],
@@ -244,6 +255,10 @@
         {name:'RESEP', widths:[16,30,10,12,16,18,14,18,16], rows:[
           ['Tanggal Resep','Nama Obat/Item','Jumlah','Satuan','Harga Jual','Pendapatan Kotor','Diskon','Pendapatan Bersih','HPP/Modal'],
           ['2026-06-01','Paracetamol 500mg',10,'tablet',2000,20000,0,20000,12000]
+        ]},
+        {name:'PAJAK', widths:[14,22,18,18,14,16,16,20,38], rows:[
+          ['Masa Pajak','Jenis Pajak','Omzet Kena Pajak','DPP/Dasar Pengenaan Pajak','Tarif Pajak','Pajak Terutang','Pajak Dibayar','Status Dokumen','Catatan Pajak'],
+          ['2026-06','PPh Final UMKM',10000000,10000000,0.005,50000,0,'draft','Estimasi manajemen, validasi dengan konsultan pajak']
         ]}
       ];
       sheets.forEach(spec=>{
