@@ -7,44 +7,86 @@
   <title>AI Clinic Owner Copilot POC</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    :root{--bg:#f6f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--green:#059669;--red:#dc2626;--amber:#d97706;--blue:#2563eb;--line:#e5e7eb}*{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}.wrap{max-width:880px;margin:0 auto;padding:16px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}h1{font-size:21px;line-height:1.2;margin:0 0 4px}.sub,.muted{color:var(--muted);font-size:13px}.card{background:var(--card);border-radius:18px;padding:16px;box-shadow:0 8px 24px rgba(15,23,42,.06);margin-bottom:12px}.hero{background:linear-gradient(135deg,#111827,#1d4ed8);color:white}.label{font-size:13px;color:rgba(255,255,255,.75);margin-bottom:8px}.hero .value{font-size:36px;font-weight:850;letter-spacing:-.04em}.hero .note{margin-top:8px;font-size:13px;color:rgba(255,255,255,.82)}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric .name{color:var(--muted);font-size:12px;margin-bottom:8px}.metric .num{font-size:20px;font-weight:850;letter-spacing:-.02em}.metric .hint{margin-top:4px;font-size:12px;color:var(--muted)}.section-title{font-size:15px;font-weight:850;margin:0 0 12px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #eef2f7}.row:first-child{border-top:0;padding-top:0}.row .cat{font-size:13px;color:#374151;text-transform:capitalize}.row .amt{font-size:13px;font-weight:850}.alert{border-left:4px solid var(--amber);background:#fffbeb;box-shadow:none;margin:0 0 10px;padding:12px}.alert.high,.alert.critical{border-left-color:var(--red);background:#fef2f2}.empty{color:var(--muted);font-size:13px}button{border:0;background:#2563eb;color:white;border-radius:12px;padding:10px 12px;font-weight:850;cursor:pointer}button.secondary{background:#111827}button:disabled{opacity:.55;cursor:not-allowed}input,select{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:white}.upload-grid{display:grid;grid-template-columns:1fr 160px 160px;gap:10px;align-items:end}.status{font-size:13px;margin-top:8px}.ok{color:var(--green)}.bad{color:var(--red)}@media(max-width:720px){.grid{grid-template-columns:1fr 1fr}.upload-grid{grid-template-columns:1fr}.wrap{padding:12px}.hero .value{font-size:30px}.card{border-radius:16px;padding:14px}}
+    :root{--bg:#f6f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--green:#059669;--red:#dc2626;--amber:#d97706;--blue:#2563eb;--line:#e5e7eb;--nav:#0f172a;--navText:#cbd5e1;--navActive:#2563eb}*{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}.app{min-height:100vh;display:grid;grid-template-columns:248px 1fr}.sidebar{background:var(--nav);color:white;padding:18px 14px;position:sticky;top:0;height:100vh}.brand{font-size:16px;font-weight:900;line-height:1.2;margin:4px 8px 18px}.brand span{display:block;color:var(--navText);font-size:12px;font-weight:600;margin-top:4px}.nav{display:grid;gap:8px}.nav button{width:100%;text-align:left;border:0;background:transparent;color:var(--navText);border-radius:12px;padding:11px 12px;font-weight:850;cursor:pointer}.nav button:hover,.nav button.active{background:var(--navActive);color:white}.nav-note{color:#94a3b8;font-size:12px;line-height:1.45;margin:18px 8px 0}.main{padding:18px}.wrap{max-width:980px;margin:0 auto}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}h1{font-size:24px;line-height:1.2;margin:0 0 4px}.sub,.muted{color:var(--muted);font-size:13px}.card{background:var(--card);border-radius:18px;padding:16px;box-shadow:0 8px 24px rgba(15,23,42,.06);margin-bottom:12px}.hero{background:linear-gradient(135deg,#111827,#1d4ed8);color:white}.label{font-size:13px;color:rgba(255,255,255,.75);margin-bottom:8px}.hero .value{font-size:38px;font-weight:850;letter-spacing:-.04em}.hero .note{margin-top:8px;font-size:13px;color:rgba(255,255,255,.82)}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.two-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.metric .name{color:var(--muted);font-size:12px;margin-bottom:8px}.metric .num{font-size:20px;font-weight:850;letter-spacing:-.02em}.metric .hint{margin-top:4px;font-size:12px;color:var(--muted)}.section-title{font-size:16px;font-weight:850;margin:0 0 12px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #eef2f7}.row:first-child{border-top:0;padding-top:0}.row .cat{font-size:13px;color:#374151;text-transform:capitalize}.row .amt{font-size:13px;font-weight:850}.alert{border-left:4px solid var(--amber);background:#fffbeb;box-shadow:none;margin:0 0 10px;padding:12px}.alert.high,.alert.critical{border-left-color:var(--red);background:#fef2f2}.empty{color:var(--muted);font-size:13px}.btn,button.primary{border:0;background:#2563eb;color:white;border-radius:12px;padding:10px 12px;font-weight:850;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}.btn.secondary,button.secondary{background:#111827}.btn.ghost{background:#eef2ff;color:#1d4ed8}.btn:disabled,button:disabled{opacity:.55;cursor:not-allowed}input,select{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:white}.upload-grid{display:grid;grid-template-columns:1fr 170px 170px;gap:10px;align-items:end}.status{font-size:13px;margin-top:8px}.ok{color:var(--green)}.bad{color:var(--red)}.view{display:none}.view.active{display:block}.template-list{display:grid;gap:8px;margin:10px 0 0;padding-left:18px}.template-box{border:1px dashed #bfdbfe;background:#eff6ff;border-radius:14px;padding:14px;margin-top:12px}.pill{display:inline-block;border-radius:999px;background:#e0f2fe;color:#075985;padding:4px 9px;font-size:12px;font-weight:800;margin:2px 4px 2px 0}@media(max-width:860px){.app{grid-template-columns:1fr}.sidebar{height:auto;position:relative}.nav{grid-template-columns:repeat(2,1fr)}.main{padding:12px}.grid,.two-grid{grid-template-columns:1fr 1fr}.upload-grid{grid-template-columns:1fr}.hero .value{font-size:30px}.card{border-radius:16px;padding:14px}}@media(max-width:560px){.grid,.two-grid,.nav{grid-template-columns:1fr}.top{display:block}.top-actions{margin-top:10px}h1{font-size:21px}}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="top"><div><h1>POC Dashboard Revenue & Profit</h1><div class="sub" id="subtitle">Loading data...</div></div><button id="refreshBtn" onclick="loadDashboard()">Refresh</button></div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">AI Clinic Owner Copilot<span>POC Revenue & Profit</span></div>
+      <nav class="nav" aria-label="Menu utama">
+        <button id="nav-dashboard" class="active" onclick="showView('dashboard')">📊 Dashboard</button>
+        <button id="nav-upload" onclick="showView('upload')">⬆️ Upload Data</button>
+        <button id="nav-quality" onclick="showView('quality')">✅ Data Quality</button>
+        <button id="nav-alerts" onclick="showView('alerts')">🔔 Alert</button>
+      </nav>
+      <div class="nav-note">Upload dipisah dari dashboard supaya flow input data klinik lebih jelas. Dashboard hanya untuk baca hasil KPI.</div>
+    </aside>
 
-    <section class="card">
-      <h2 class="section-title">Upload Excel / CSV</h2>
-      <div class="upload-grid">
-        <div><div class="muted">File SIM export. Sheet bernama PENDAPATAN/BIAYA lebih akurat; CSV auto-detect sederhana.</div><input id="fileInput" type="file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
-        <div><label class="muted">Periode KPI</label><input id="periodInput" placeholder="YYYY-MM"></div>
-        <div><button id="uploadBtn" onclick="uploadFile()">Upload & Hitung</button></div>
+    <main class="main">
+      <div class="wrap">
+        <section id="view-dashboard" class="view active">
+          <div class="top"><div><h1>Dashboard Revenue & Profit</h1><div class="sub" id="subtitle">Loading data...</div></div><div class="top-actions"><button id="refreshBtn" class="primary" onclick="loadDashboard()">Refresh</button><button class="secondary" onclick="showView('upload')">Upload Data</button></div></div>
+          <section class="card hero"><div class="label" id="profitLabel">Net Profit</div><div class="value" id="netProfit">-</div><div class="note" id="profitNote">-</div></section>
+          <section class="grid">
+            <div class="card metric"><div class="name">Revenue</div><div class="num" id="revenue">-</div><div class="hint" id="revenueGrowth">Growth -</div></div>
+            <div class="card metric"><div class="name">Profit</div><div class="num" id="profitMini">-</div><div class="hint" id="profitGrowth">Growth -</div></div>
+            <div class="card metric"><div class="name">Cost</div><div class="num" id="costs">-</div><div class="hint">Total biaya</div></div>
+            <div class="card metric"><div class="name">Margin</div><div class="num" id="margin">-</div><div class="hint">Net Profit / Revenue</div></div>
+          </section>
+          <section class="two-grid">
+            <div class="card"><h2 class="section-title">Revenue Breakdown</h2><div id="revenueBreakdown"></div></div>
+            <div class="card"><h2 class="section-title">Cost Breakdown</h2><div id="costBreakdown"></div></div>
+          </section>
+          <section class="card"><h2 class="section-title">Revenue vs Profit Harian</h2><canvas id="financeChart" height="170"></canvas><div class="empty" id="chartEmpty" style="display:none">Trend harian belum tersedia.</div></section>
+        </section>
+
+        <section id="view-upload" class="view">
+          <div class="top"><div><h1>Upload Data Klinik</h1><div class="sub">Upload Excel/CSV SIM klinik, lalu hitung KPI untuk periode yang dipilih.</div></div><div class="top-actions"><button class="secondary" onclick="showView('dashboard')">Lihat Dashboard</button></div></div>
+          <section class="card">
+            <h2 class="section-title">Template Excel Data Klinik</h2>
+            <div class="muted">Download template ini, isi sheet yang relevan, lalu upload kembali. Minimal untuk dashboard profit: <b>PENDAPATAN</b> dan <b>BIAYA</b>.</div>
+            <div class="template-box">
+              <button class="primary" onclick="downloadClinicTemplate()">Download Template Excel</button>
+              <div style="margin-top:10px"><span class="pill">PENDAPATAN</span><span class="pill">BIAYA</span><span class="pill">KUNJUNGAN</span><span class="pill">TINDAKAN</span><span class="pill">RESEP</span></div>
+              <ul class="template-list muted">
+                <li>Jangan isi nama pasien, NIK, nomor HP, alamat, diagnosis, atau rekam medis.</li>
+                <li>Kolom tanggal pakai format YYYY-MM-DD.</li>
+                <li>Nominal tanpa titik/koma ribuan agar import lebih aman.</li>
+              </ul>
+            </div>
+          </section>
+          <section class="card">
+            <h2 class="section-title">Upload Excel / CSV</h2>
+            <div class="upload-grid">
+              <div><div class="muted">File SIM export. Sheet bernama PENDAPATAN/BIAYA lebih akurat; CSV auto-detect sederhana.</div><input id="fileInput" type="file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+              <div><label class="muted">Periode KPI</label><input id="periodInput" placeholder="YYYY-MM"></div>
+              <div><button id="uploadBtn" class="primary" onclick="uploadFile()">Upload & Hitung</button></div>
+            </div>
+            <div class="status" id="uploadStatus">AI belum diaktifkan di POC ini.</div>
+          </section>
+        </section>
+
+        <section id="view-quality" class="view">
+          <div class="top"><div><h1>Data Quality</h1><div class="sub">Issue validasi dari data import periode aktif.</div></div><div class="top-actions"><button class="primary" onclick="loadDashboard()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">Data Quality Warning</h2><div id="dataQuality"></div></section>
+        </section>
+
+        <section id="view-alerts" class="view">
+          <div class="top"><div><h1>Alert</h1><div class="sub">Peringatan bisnis dari KPI periode aktif.</div></div><div class="top-actions"><button class="primary" onclick="loadDashboard()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">Alert Aktif</h2><div id="alerts"></div></section>
+        </section>
       </div>
-      <div class="status" id="uploadStatus">AI belum diaktifkan di POC ini.</div>
-    </section>
-
-    <section class="card hero"><div class="label" id="profitLabel">Net Profit</div><div class="value" id="netProfit">-</div><div class="note" id="profitNote">-</div></section>
-
-    <section class="grid">
-      <div class="card metric"><div class="name">Revenue</div><div class="num" id="revenue">-</div><div class="hint" id="revenueGrowth">Growth -</div></div>
-      <div class="card metric"><div class="name">Profit</div><div class="num" id="profitMini">-</div><div class="hint" id="profitGrowth">Growth -</div></div>
-      <div class="card metric"><div class="name">Cost</div><div class="num" id="costs">-</div><div class="hint">Total biaya</div></div>
-      <div class="card metric"><div class="name">Margin</div><div class="num" id="margin">-</div><div class="hint">Net Profit / Revenue</div></div>
-    </section>
-
-    <section class="card"><h2 class="section-title">Revenue Breakdown</h2><div id="revenueBreakdown"></div></section>
-    <section class="card"><h2 class="section-title">Cost Breakdown</h2><div id="costBreakdown"></div></section>
-    <section class="card"><h2 class="section-title">Revenue vs Profit Harian</h2><canvas id="financeChart" height="170"></canvas><div class="empty" id="chartEmpty" style="display:none">Trend harian belum tersedia.</div></section>
-    <section class="card"><h2 class="section-title">Data Quality</h2><div id="dataQuality"></div></section>
-    <section class="card"><h2 class="section-title">Alert</h2><div id="alerts"></div></section>
+    </main>
   </div>
   <script>
     let chart;
+    const viewIds=['dashboard','upload','quality','alerts'];
     function rupiah(value){const n=Number(value||0),abs=Math.abs(n),sign=n<0?'-':'';if(abs>=1e9)return sign+'Rp'+(abs/1e9).toFixed(1).replace('.0','')+' M';if(abs>=1e6)return sign+'Rp'+(abs/1e6).toFixed(1).replace('.0','')+' jt';return sign+'Rp'+abs.toLocaleString('id-ID')}
     function pct(value){if(value===null||value===undefined||value==='')return'-';return(Number(value)*100).toFixed(1).replace('.0','')+'%'}
     function setText(id,text){document.getElementById(id).textContent=text}
-    function setBusy(id,busy,text){const el=document.getElementById(id);el.disabled=busy;if(text)el.textContent=text}
+    function setBusy(id,busy,text){const el=document.getElementById(id);if(!el)return;el.disabled=busy;if(text)el.textContent=text}
+    function showView(name){viewIds.forEach(id=>{document.getElementById('view-'+id).classList.toggle('active',id===name);document.getElementById('nav-'+id).classList.toggle('active',id===name)});if(name==='dashboard'&&!chart)loadDashboard()}
     function loadDashboard(){setBusy('refreshBtn',true,'Loading...');const p=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(render).withFailureHandler(err=>{alert(err.message||err);setBusy('refreshBtn',false,'Refresh')}).getDefaultDashboardPayload(p)}
     function uploadFile(){const file=document.getElementById('fileInput').files[0];if(!file){alert('Pilih file Excel/CSV dulu.');return}setBusy('uploadBtn',true,'Uploading...');setText('uploadStatus','Membaca file...');const reader=new FileReader();reader.onload=function(){const period=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(res=>{if(res&&res.ok===false){setStatus('uploadStatus',res.message||'Upload ditolak.','bad');setBusy('uploadBtn',false,'Upload & Hitung');return}setStatus('uploadStatus','Upload sukses. Rows written: '+res.rowsWritten+', failed: '+res.rowsFailed+'. Period: '+res.period,'ok');setBusy('uploadBtn',false,'Upload & Hitung');if(res.period)document.getElementById('periodInput').value=res.period;loadDashboard()}).withFailureHandler(err=>{setStatus('uploadStatus','Upload gagal: '+(err.message||err),'bad');setBusy('uploadBtn',false,'Upload & Hitung')}).uploadPocFile(reader.result,file.name,file.type,{period:period||undefined})};reader.readAsDataURL(file)}
     function setStatus(id,text,cls){const el=document.getElementById(id);el.textContent=text;el.className='status '+(cls||'')}
@@ -55,6 +97,9 @@
     function renderDataQuality(rows){const el=document.getElementById('dataQuality');clearNode(el);if(!rows.length){appendEmpty(el,'Tidak ada data quality issue aktif untuk periode ini.');return}rows.forEach(q=>{const card=document.createElement('div');card.className='alert '+String(q.severity||'');const title=document.createElement('b');title.textContent=String(q.severity||'').toUpperCase()+' — '+(q.issueType||'data_quality');const br=document.createElement('br');const msg=document.createElement('span');msg.className='empty';msg.textContent=(q.targetSheet||'sheet')+' row '+(q.rowNumber||'-')+' '+(q.columnName||'')+': '+(q.message||'');card.appendChild(title);card.appendChild(br);card.appendChild(msg);el.appendChild(card)})}
     function renderAlerts(rows){const el=document.getElementById('alerts');clearNode(el);if(!rows.length){appendEmpty(el,'Tidak ada alert aktif.');return}rows.forEach(a=>{const card=document.createElement('div');card.className='alert '+String(a.severity||'');const title=document.createElement('b');title.textContent=String(a.severity||'').toUpperCase()+' — '+(a.title||'Alert');const br=document.createElement('br');const msg=document.createElement('span');msg.className='empty';msg.textContent=a.message||'';card.appendChild(title);card.appendChild(br);card.appendChild(msg);el.appendChild(card)})}
     function renderChart(rows){const ctx=document.getElementById('financeChart');document.getElementById('chartEmpty').style.display=rows.length?'none':'block';if(chart)chart.destroy();chart=new Chart(ctx,{type:'line',data:{labels:rows.map(r=>r.date),datasets:[{label:'Revenue',data:rows.map(r=>r.totalRevenue),borderColor:'#2563eb',tension:.35},{label:'Profit',data:rows.map(r=>r.netProfit),borderColor:'#059669',tension:.35},{label:'Cost',data:rows.map(r=>r.totalCost),borderColor:'#dc2626',tension:.35}]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{ticks:{callback:v=>rupiah(v)}}}}})}
+    function xmlEscape(value){return String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+    function sheetXml(name,headers,rows){let xml='<Worksheet ss:Name="'+xmlEscape(name)+'"><Table><Row>';headers.forEach(h=>{xml+='<Cell><Data ss:Type="String">'+xmlEscape(h)+'</Data></Cell>'});xml+='</Row>';rows.forEach(row=>{xml+='<Row>';headers.forEach(h=>{const value=row[h]||'';const isNumber=value!==''&&!isNaN(Number(value))&&String(value).match(/^[-]?\d+(\.\d+)?$/);xml+='<Cell><Data ss:Type="'+(isNumber?'Number':'String')+'">'+xmlEscape(value)+'</Data></Cell>'});xml+='</Row>'});return xml+'</Table></Worksheet>'}
+    function downloadClinicTemplate(){const sheets=[['PENDAPATAN',['transaction_date','revenue_type','item_name','quantity','unit_price','gross_amount','discount_amount','net_amount','paid_amount','receivable_amount','payment_method','payer_type','doctor_id','poli_id'],[{transaction_date:'2026-06-01',revenue_type:'tindakan',item_name:'Konsultasi Dokter',quantity:'10',unit_price:'150000',gross_amount:'1500000',discount_amount:'0',net_amount:'1500000',paid_amount:'1500000',receivable_amount:'0',payment_method:'cash',payer_type:'umum',doctor_id:'dr_001',poli_id:'umum'}]],['BIAYA',['expense_date','expense_category','expense_name','amount','payment_method','vendor_name','cost_type'],[{expense_date:'2026-06-01',expense_category:'operasional',expense_name:'Gaji staff',amount:'5000000',payment_method:'transfer',vendor_name:'',cost_type:'operational'}]],['KUNJUNGAN',['visit_date','patient_ref','patient_type','payer_type','doctor_id','poli_id','service_category','service_name','status'],[{visit_date:'2026-06-01',patient_ref:'anon_001',patient_type:'umum',payer_type:'umum',doctor_id:'dr_001',poli_id:'umum',service_category:'rawat_jalan',service_name:'Konsultasi',status:'completed'}]],['TINDAKAN',['procedure_date','procedure_name','procedure_category','quantity','unit_price','gross_amount','discount_amount','net_amount','doctor_id','poli_id'],[{procedure_date:'2026-06-01',procedure_name:'Konsultasi Dokter',procedure_category:'konsultasi',quantity:'1',unit_price:'150000',gross_amount:'150000',discount_amount:'0',net_amount:'150000',doctor_id:'dr_001',poli_id:'umum'}]],['RESEP',['prescription_date','item_name','quantity','unit','unit_price','gross_amount','discount_amount','net_amount','cogs_amount'],[{prescription_date:'2026-06-01',item_name:'Paracetamol 500mg',quantity:'10',unit:'tablet',unit_price:'2000',gross_amount:'20000',discount_amount:'0',net_amount:'20000',cogs_amount:'12000'}]]];let workbook='<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">';sheets.forEach(s=>{workbook+=sheetXml(s[0],s[1],s[2])});workbook+='</Workbook>';const blob=new Blob([workbook],{type:'application/vnd.ms-excel'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='template-data-klinik-ai-clinic.xls';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
     window.onload=loadDashboard;
   </script>
 </body>
