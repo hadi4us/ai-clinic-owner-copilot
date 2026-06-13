@@ -4,7 +4,7 @@
  * No AI logic here.
  */
 function uploadPocFile(base64Data, fileName, mimeType, options) {
-  const context = resolveRequestContext_({}, options || {}, 'owner');
+  const context = resolveRequestContext_({}, options || {}, 'finance');
   return uploadPocFileForContext_(context, base64Data, fileName, mimeType, options || {});
 }
 

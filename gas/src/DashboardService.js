@@ -110,7 +110,7 @@ function getDashboardPayloadForContext_(context, period) {
 }
 
 function getDefaultDashboardPayload(period) {
-  const context = resolveRequestContext_({}, {}, 'owner');
+  const context = resolveRequestContext_({}, {}, 'viewer');
   return getDashboardPayloadForContext_(context, period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'));
 }
 

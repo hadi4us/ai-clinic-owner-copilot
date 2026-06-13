@@ -7,14 +7,15 @@ function healthCheck() {
 function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
   const action = params.action;
+  if (action === 'authState') return jsonOutput_(getDefaultAuthState());
   if (action === 'health') return jsonOutput_(healthCheck());
   if (action === 'readiness') return jsonOutput_(readinessCheck());
   if (action === 'dashboardPayload') {
-    const context = resolveRequestContext_(params, {}, 'owner');
+    const context = resolveRequestContext_(params, {}, 'viewer');
     return jsonOutput_(getDashboardPayloadForContext_(context, params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
   }
   if (action === 'financialReport') {
-    const context = resolveRequestContext_(params, {}, 'owner');
+    const context = resolveRequestContext_(params, {}, 'finance');
     return jsonOutput_(getFinancialReportPayload(context.tenantId, context.clinicId, params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
   }
   if (['setup', 'compute', 'resetFixture', 'upload', 'manualInput'].indexOf(action) !== -1) {
@@ -33,7 +34,7 @@ function doPost(e) {
   const action = params.action || payload.action;
   if (action === 'upload') {
     assertPilotMutationAllowed_(params, payload);
-    const context = resolveRequestContext_(params, payload, 'owner');
+    const context = resolveRequestContext_(params, payload, 'finance');
     return jsonOutput_(uploadPocFileForContext_(context, payload.base64Data, payload.fileName, payload.mimeType, payload.options || {}));
   }
   if (action === 'setup') {
@@ -43,12 +44,12 @@ function doPost(e) {
   }
   if (action === 'compute') {
     assertPilotMutationAllowed_(params, payload);
-    const context = resolveRequestContext_(params, payload, 'owner');
+    const context = resolveRequestContext_(params, payload, 'finance');
     return jsonOutput_(computePocKpis(context.tenantId, context.clinicId, payload.period || params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
   }
   if (action === 'manualInput') {
     assertPilotMutationAllowed_(params, payload);
-    const context = resolveRequestContext_(params, payload, 'owner');
+    const context = resolveRequestContext_(params, payload, 'finance');
     return jsonOutput_(saveManualClinicEntryForContext_(context, payload.entry || payload));
   }
   if (action === 'resetFixture') {

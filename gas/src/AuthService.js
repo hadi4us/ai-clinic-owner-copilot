@@ -19,6 +19,44 @@ function resolveRequestContext_(params, payload, requiredRole) {
   return requireClinicAccess_(actor, requestedTenantId, requestedClinicId, requiredRole || 'owner');
 }
 
+function getDefaultAuthState() {
+  const actor = getCurrentActor_();
+  const userId = actor && actor.userId ? String(actor.userId).trim().toLowerCase() : '';
+  if (!userId) return { ok: false, authenticated: false, error: 'UNAUTHENTICATED', message: 'Google session tidak terdeteksi. Buka web app dengan akun Google yang diberi akses.' };
+  const rows = getRowsAsObjects_('USER_ACCESS').filter(row => userMatchesAccessRow_(userId, row) && String(row.status || 'active').toLowerCase() === 'active');
+  if (!rows.length) return { ok: false, authenticated: true, authorized: false, email: userId, effectiveEmail: actor.effectiveEmail || '', error: 'FORBIDDEN', message: 'Akun ini belum terdaftar di USER_ACCESS.' };
+  const contexts = rows.map(row => {
+    const role = normalizeRole_(row.role);
+    return {
+      tenantId: row.tenant_id || '',
+      clinicScope: row.clinic_scope || '',
+      clinicId: resolveDefaultClinicForTenant_([row], row.tenant_id || '') || row.clinic_scope || '',
+      role,
+      roleLabel: roleLabel_(role),
+      permissions: permissionsForRole_(role),
+      userName: row.user_name || row.email || userId,
+      email: row.email || userId,
+    };
+  });
+  const primary = contexts[0];
+  updateLastLoginForUser_(userId);
+  return {
+    ok: true,
+    authenticated: true,
+    authorized: true,
+    email: primary.email || userId,
+    userName: primary.userName || userId,
+    effectiveEmail: actor.effectiveEmail || '',
+    tenantId: primary.tenantId,
+    clinicId: primary.clinicId,
+    clinicScope: primary.clinicScope,
+    role: primary.role,
+    roleLabel: primary.roleLabel,
+    permissions: primary.permissions,
+    contexts,
+  };
+}
+
 function requireClinicAccess_(actor, requestedTenantId, requestedClinicId, requiredRole) {
   const userId = actor && actor.userId ? String(actor.userId).trim().toLowerCase() : '';
   if (!userId) throw new Error('UNAUTHENTICATED: Google session tidak terdeteksi. Gunakan akses web app terbatas, bukan anonymous, untuk data pilot.');
@@ -36,6 +74,7 @@ function requireClinicAccess_(actor, requestedTenantId, requestedClinicId, requi
   if (!clinicRows.length) throw new Error('FORBIDDEN: actor tidak boleh mengakses clinic ini.');
   return {
     actorId: userId,
+    userEmail: userId,
     role: normalizeRole_(clinicRows[0].role),
     tenantId,
     clinicId,
@@ -51,8 +90,8 @@ function userMatchesAccessRow_(userId, row) {
 }
 
 function roleAllows_(actualRole, requiredRole) {
-  const rank = { staff: 1, finance: 2, manager: 3, owner: 4, admin: 5 };
-  return (rank[normalizeRole_(actualRole)] || 0) >= (rank[normalizeRole_(requiredRole)] || 4);
+  const rank = { viewer: 1, staff: 2, finance: 3, manager: 4, owner: 5, admin: 6 };
+  return (rank[normalizeRole_(actualRole)] || 0) >= (rank[normalizeRole_(requiredRole)] || 5);
 }
 
 function normalizeRole_(role) {
@@ -75,4 +114,38 @@ function resolveDefaultClinicForTenant_(rows, tenantId) {
 function assertContextScope_(context, tenantId, clinicId) {
   if (!context) throw new Error('Missing verified tenant context.');
   if (context.tenantId !== tenantId || context.clinicId !== clinicId) throw new Error('FORBIDDEN: request context scope mismatch.');
+}
+
+function permissionsForRole_(role) {
+  role = normalizeRole_(role);
+  return {
+    viewDashboard: roleAllows_(role, 'viewer'),
+    viewReports: roleAllows_(role, 'finance'),
+    viewQuality: roleAllows_(role, 'finance'),
+    viewAlerts: roleAllows_(role, 'manager'),
+    uploadData: roleAllows_(role, 'finance'),
+    manualInput: roleAllows_(role, 'finance'),
+    manageSettings: roleAllows_(role, 'owner'),
+    setup: roleAllows_(role, 'owner'),
+    resetData: roleAllows_(role, 'owner'),
+    manageUsers: roleAllows_(role, 'admin'),
+  };
+}
+
+function roleLabel_(role) {
+  const labels = { viewer: 'Viewer', staff: 'Staff', finance: 'Finance/Admin', manager: 'Manager', owner: 'Owner', admin: 'Admin' };
+  return labels[normalizeRole_(role)] || 'Unknown';
+}
+
+function updateLastLoginForUser_(userId) {
+  try {
+    const now = new Date();
+    updateObjectsWhere_('USER_ACCESS', row => userMatchesAccessRow_(userId, row), row => {
+      row.last_login_at = now;
+      row.updated_at = now;
+      return row;
+    });
+  } catch (err) {
+    // Auth state must not fail just because audit metadata cannot be updated.
+  }
 }

@@ -54,7 +54,7 @@ function getFinancialReportPayload(tenantId, clinicId, period) {
 }
 
 function getDefaultFinancialReportPayload(period) {
-  const context = resolveRequestContext_({}, {}, 'owner');
+  const context = resolveRequestContext_({}, {}, 'finance');
   const resolvedPeriod = normalizeReportPeriod_(period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'));
   return getFinancialReportPayload(context.tenantId, context.clinicId, resolvedPeriod);
 }

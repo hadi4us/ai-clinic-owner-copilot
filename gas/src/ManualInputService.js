@@ -73,12 +73,12 @@ function saveManualClinicEntryForContext_(context, entry) {
 }
 
 function saveDefaultManualClinicEntry(entry) {
-  const context = resolveRequestContext_({}, {}, 'owner');
+  const context = resolveRequestContext_({}, {}, 'finance');
   return saveManualClinicEntryForContext_(context, entry || {});
 }
 
 function getDefaultManualInputOptions() {
-  const context = resolveRequestContext_({}, {}, 'owner');
+  const context = resolveRequestContext_({}, {}, 'finance');
   ensurePhase1WarehouseSheetsNoLock_();
   const active = row => String(row.status || 'active').toLowerCase() !== 'inactive';
   const doctors = getRowsAsObjects_('MASTER_DOKTER')
