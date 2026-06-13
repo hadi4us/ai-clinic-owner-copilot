@@ -18,6 +18,10 @@ function doGet(e) {
     const context = resolveRequestContext_(params, {}, 'finance');
     return jsonOutput_(getFinancialReportPayload(context.tenantId, context.clinicId, params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
   }
+  if (action === 'transactionList') {
+    const context = resolveRequestContext_(params, {}, 'finance');
+    return jsonOutput_(getTransactionListPayloadForContext_(context, params.type || 'all', params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'), params.limit || 100));
+  }
   if (['setup', 'compute', 'resetFixture', 'upload', 'manualInput'].indexOf(action) !== -1) {
     return jsonOutput_({ ok: false, error: 'MUTATING_GET_DISABLED', message: 'Action mutasi hanya tersedia via POST dengan token pilot.' });
   }

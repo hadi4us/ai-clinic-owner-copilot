@@ -126,3 +126,47 @@ function getDefaultManualInputOptions() {
     ]
   };
 }
+
+function getDefaultTransactionListPayload(type, period, limit) {
+  const context = resolveRequestContext_({}, {}, 'finance');
+  return getTransactionListPayloadForContext_(context, type || 'all', period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'), limit || 100);
+}
+
+function getTransactionListPayloadForContext_(context, type, period, limit) {
+  assertTenantScope_(context.tenantId, context.clinicId);
+  const normalizedType = normalizeHeaderKey_(type || 'all');
+  const normalizedPeriod = String(period || '').slice(0, 7) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM');
+  const maxRows = Math.max(1, Math.min(Number(limit || 100), 300));
+  const rows = [];
+  const include = name => normalizedType === 'all' || normalizedType === name;
+  if (include('pendapatan')) {
+    getRowsAsObjects_('PENDAPATAN').filter(row => transactionRowInScope_(row, context, row.transaction_date, normalizedPeriod)).forEach(row => rows.push({
+      type: 'pendapatan', date: toIsoDateString_(row.transaction_date), category: row.revenue_type || '', description: row.item_name || '', amount: asNumber_(row.net_amount, 0),
+      paymentMethod: row.payment_method || '', payerType: row.payer_type || '', doctor: row.doctor_id || '', poli: row.poli_id || '', status: row.status || '', importId: row.import_id || '', id: row.revenue_id || row.transaction_id || ''
+    }));
+  }
+  if (include('biaya')) {
+    getRowsAsObjects_('BIAYA').filter(row => transactionRowInScope_(row, context, row.expense_date, normalizedPeriod)).forEach(row => rows.push({
+      type: 'biaya', date: toIsoDateString_(row.expense_date), category: row.expense_category || '', description: row.expense_name || '', amount: -Math.abs(asNumber_(row.amount, 0)),
+      paymentMethod: row.payment_method || '', payerType: '', doctor: '', poli: '', status: row.status || '', importId: row.import_id || '', id: row.expense_id || ''
+    }));
+  }
+  if (include('pajak')) {
+    getRowsAsObjects_('PAJAK').filter(row => transactionRowInScope_(row, context, row.tax_period, normalizedPeriod)).forEach(row => rows.push({
+      type: 'pajak', date: String(row.tax_period || normalizedPeriod).slice(0, 7), category: row.tax_type || '', description: row.notes || row.document_status || 'Rekap pajak', amount: -Math.abs(asNumber_(row.tax_payable, 0)),
+      paymentMethod: '', payerType: '', doctor: '', poli: '', status: row.document_status || '', importId: row.import_id || '', id: row.tax_id || ''
+    }));
+  }
+  if (include('kunjungan')) {
+    getRowsAsObjects_('KUNJUNGAN').filter(row => transactionRowInScope_(row, context, row.visit_date, normalizedPeriod)).forEach(row => rows.push({
+      type: 'kunjungan', date: toIsoDateString_(row.visit_date), category: row.service_category || '', description: row.service_name || '', amount: 0,
+      paymentMethod: '', payerType: row.payer_type || row.patient_type || '', doctor: row.doctor_id || '', poli: row.poli_id || '', status: row.status || '', importId: row.import_id || '', id: row.visit_id || '', patientRef: row.patient_ref || ''
+    }));
+  }
+  rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id || '').localeCompare(String(a.id || '')));
+  return { ok: true, tenantId: context.tenantId, clinicId: context.clinicId, period: normalizedPeriod, type: normalizedType, count: Math.min(rows.length, maxRows), totalCount: rows.length, rows: rows.slice(0, maxRows), generatedAt: new Date() };
+}
+
+function transactionRowInScope_(row, context, dateValue, period) {
+  return row && row.tenant_id === context.tenantId && row.clinic_id === context.clinicId && String(dateValue || '').slice(0, 7) === String(period || '').slice(0, 7);
+}
