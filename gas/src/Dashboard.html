@@ -18,10 +18,12 @@
       <nav class="nav" aria-label="Menu utama">
         <button id="nav-dashboard" class="active" onclick="showView('dashboard')">📊 Dashboard</button>
         <button id="nav-upload" onclick="showView('upload')">⬆️ Upload Data</button>
+        <button id="nav-manual" onclick="showView('manual')">✍️ Input Manual</button>
+        <button id="nav-reports" onclick="showView('reports')">📑 Laporan Keuangan</button>
         <button id="nav-quality" onclick="showView('quality')">✅ Data Quality</button>
         <button id="nav-alerts" onclick="showView('alerts')">🔔 Alert</button>
       </nav>
-      <div class="nav-note">Upload dipisah dari dashboard supaya flow input data klinik lebih jelas. Dashboard hanya untuk baca hasil KPI.</div>
+      <div class="nav-note">Upload, input manual, laporan keuangan, dan dashboard dipisah supaya owner/admin lebih mudah pakai.</div>
     </aside>
 
     <main class="main">
@@ -68,6 +70,42 @@
           </section>
         </section>
 
+        <section id="view-manual" class="view">
+          <div class="top"><div><h1>Input Data Manual</h1><div class="sub">Alternatif jika klinik belum punya file SIM/Excel. Input satu transaksi per kali simpan.</div></div><div class="top-actions"><button class="secondary" onclick="showView('dashboard')">Lihat Dashboard</button></div></div>
+          <section class="card">
+            <h2 class="section-title">Form Input Manual</h2>
+            <div class="two-grid">
+              <div><label class="muted">Jenis Data</label><select id="manualType" onchange="updateManualHelp()"><option value="pendapatan">Pendapatan</option><option value="biaya">Biaya</option><option value="pajak">Pajak</option><option value="kunjungan">Kunjungan</option></select></div>
+              <div><label class="muted">Tanggal / Periode</label><input id="manualDate" placeholder="YYYY-MM-DD atau YYYY-MM"></div>
+            </div>
+            <div class="two-grid" style="margin-top:10px">
+              <div><label class="muted">Kategori / Jenis</label><input id="manualCategory" placeholder="tindakan, obat, operasional, PPh, PPN..."></div>
+              <div><label class="muted">Nominal</label><input id="manualAmount" placeholder="1500000"></div>
+            </div>
+            <div style="margin-top:10px"><label class="muted">Keterangan</label><input id="manualDescription" placeholder="Konsultasi dokter / Gaji staff / Pajak bulan ini"></div>
+            <div class="two-grid" style="margin-top:10px">
+              <div><label class="muted">Metode Bayar</label><input id="manualPayment" placeholder="cash, transfer, qris, bpjs"></div>
+              <div><label class="muted">Dokter/Poli/Vendor</label><input id="manualParty" placeholder="dr_001 / umum / vendor"></div>
+            </div>
+            <div class="template-box"><div class="muted" id="manualHelp">Pendapatan: isi tanggal transaksi, kategori, nominal pendapatan bersih, metode bayar, dan keterangan layanan.</div></div>
+            <button id="manualBtn" class="primary" onclick="saveManualEntry()">Simpan & Hitung KPI</button>
+            <div class="status" id="manualStatus">Belum ada input manual.</div>
+          </section>
+        </section>
+
+        <section id="view-reports" class="view">
+          <div class="top"><div><h1>Laporan Keuangan</h1><div class="sub">Laporan standar Indonesia versi manajemen: Laba Rugi, Arus Kas, Posisi Keuangan, dan Pajak.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh Laporan</button></div></div>
+          <section class="card alert"><b>Catatan pajak & akuntansi</b><br><span class="empty">Ini laporan manajemen POC. Final SPT/laporan resmi tetap perlu validasi konsultan pajak/akuntan sesuai status badan usaha, PKP/non-PKP, dan regulasi terbaru.</span></section>
+          <section class="two-grid">
+            <div class="card"><h2 class="section-title">Laporan Laba Rugi</h2><div id="reportProfitLoss"></div></div>
+            <div class="card"><h2 class="section-title">Arus Kas Ringkas</h2><div id="reportCashFlow"></div></div>
+          </section>
+          <section class="two-grid">
+            <div class="card"><h2 class="section-title">Posisi Keuangan Sederhana</h2><div id="reportPosition"></div></div>
+            <div class="card"><h2 class="section-title">Rekap Pajak</h2><div id="reportTax"></div></div>
+          </section>
+        </section>
+
         <section id="view-quality" class="view">
           <div class="top"><div><h1>Data Quality</h1><div class="sub">Issue validasi dari data import periode aktif.</div></div><div class="top-actions"><button class="primary" onclick="loadDashboard()">Refresh</button></div></div>
           <section class="card"><h2 class="section-title">Data Quality Warning</h2><div id="dataQuality"></div></section>
@@ -82,12 +120,12 @@
   </div>
   <script>
     let chart;
-    const viewIds=['dashboard','upload','quality','alerts'];
+    const viewIds=['dashboard','upload','manual','reports','quality','alerts'];
     function rupiah(value){const n=Number(value||0),abs=Math.abs(n),sign=n<0?'-':'';if(abs>=1e9)return sign+'Rp'+(abs/1e9).toFixed(1).replace('.0','')+' M';if(abs>=1e6)return sign+'Rp'+(abs/1e6).toFixed(1).replace('.0','')+' jt';return sign+'Rp'+abs.toLocaleString('id-ID')}
     function pct(value){if(value===null||value===undefined||value==='')return'-';return(Number(value)*100).toFixed(1).replace('.0','')+'%'}
     function setText(id,text){document.getElementById(id).textContent=text}
     function setBusy(id,busy,text){const el=document.getElementById(id);if(!el)return;el.disabled=busy;if(text)el.textContent=text}
-    function showView(name){viewIds.forEach(id=>{document.getElementById('view-'+id).classList.toggle('active',id===name);document.getElementById('nav-'+id).classList.toggle('active',id===name)});if(name==='dashboard'&&!chart)loadDashboard()}
+    function showView(name){viewIds.forEach(id=>{document.getElementById('view-'+id).classList.toggle('active',id===name);document.getElementById('nav-'+id).classList.toggle('active',id===name)});if(name==='dashboard'&&!chart)loadDashboard();if(name==='reports')loadReports()}
     function loadDashboard(){setBusy('refreshBtn',true,'Loading...');const p=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(render).withFailureHandler(err=>{alert(err.message||err);setBusy('refreshBtn',false,'Refresh')}).getDefaultDashboardPayload(p)}
     function uploadFile(){const file=document.getElementById('fileInput').files[0];if(!file){alert('Pilih file Excel/CSV dulu.');return}setBusy('uploadBtn',true,'Uploading...');setText('uploadStatus','Membaca file...');const reader=new FileReader();reader.onload=function(){const period=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(res=>{if(res&&res.ok===false){setStatus('uploadStatus',res.message||'Upload ditolak.','bad');setBusy('uploadBtn',false,'Upload & Hitung');return}setStatus('uploadStatus','Upload sukses. Rows written: '+res.rowsWritten+', failed: '+res.rowsFailed+'. Period: '+res.period,'ok');setBusy('uploadBtn',false,'Upload & Hitung');if(res.period)document.getElementById('periodInput').value=res.period;loadDashboard()}).withFailureHandler(err=>{setStatus('uploadStatus','Upload gagal: '+(err.message||err),'bad');setBusy('uploadBtn',false,'Upload & Hitung')}).uploadPocFile(reader.result,file.name,file.type,{period:period||undefined})};reader.readAsDataURL(file)}
     function setStatus(id,text,cls){const el=document.getElementById(id);el.textContent=text;el.className='status '+(cls||'')}
@@ -145,7 +183,8 @@
       });
       XLSX.writeFile(wb,'template-data-klinik-ai-clinic.xlsx');
     }
-    window.onload=loadDashboard;
+\n    function renderReportRows(id,rows){const el=document.getElementById(id);clearNode(el);if(!rows||!rows.length){appendEmpty(el,'Belum ada data laporan.');return}rows.forEach(r=>{const row=document.createElement('div');row.className='row';const left=document.createElement('div');const cat=document.createElement('div');cat.className='cat';cat.textContent=r.label||r.taxType||'-';const note=document.createElement('div');note.className='empty';note.textContent=r.note||r.notes||r.documentStatus||'';const amt=document.createElement('div');amt.className='amt';amt.textContent=rupiah(r.amount!==undefined?r.amount:(r.taxPayable||0));left.appendChild(cat);left.appendChild(note);row.appendChild(left);row.appendChild(amt);el.appendChild(row)})}\n    function loadReports(){const p=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(renderReports).withFailureHandler(err=>alert(err.message||err)).getDefaultFinancialReportPayload(p)}\n    function renderReports(payload){renderReportRows('reportProfitLoss',payload.labaRugi||[]);renderReportRows('reportCashFlow',payload.arusKas||[]);renderReportRows('reportPosition',payload.posisiKeuangan||[]);renderReportRows('reportTax',(payload.pajak||[]).map(t=>({label:t.taxType,amount:t.taxPayable,note:'Tarif '+pct(t.taxRate)+' • dibayar '+rupiah(t.taxPaid)+' • outstanding '+rupiah(t.taxOutstanding)+' • '+(t.notes||'')})))}\n    function updateManualHelp(){const t=document.getElementById('manualType').value;const help={pendapatan:'Pendapatan: isi tanggal transaksi, kategori layanan/item, nominal pendapatan bersih, metode bayar, dan keterangan.',biaya:'Biaya: isi tanggal biaya, kategori biaya, nominal, metode bayar, dan vendor/keterangan.',pajak:'Pajak: isi periode YYYY-MM, jenis pajak di kategori, nominal pajak terutang, dan keterangan. Untuk pajak dibayar, masukkan sebagai nominal jika sudah dibayar.',kunjungan:'Kunjungan: isi tanggal, jenis/kategori layanan, keterangan layanan, dokter/poli bila ada. Nominal boleh kosong.'};setText('manualHelp',help[t]||'Isi data manual.') }\n    function saveManualEntry(){const type=document.getElementById('manualType').value;const date=document.getElementById('manualDate').value;const entry={type:type,date:date,period:date&&date.length>=7?date.slice(0,7):document.getElementById('periodInput').value,category:document.getElementById('manualCategory').value,amount:document.getElementById('manualAmount').value,description:document.getElementById('manualDescription').value,paymentMethod:document.getElementById('manualPayment').value};const party=document.getElementById('manualParty').value;if(type==='biaya')entry.vendor=party;else{entry.doctor=party;entry.poli=party}if(type==='pajak'){entry.taxType=entry.category||'Pajak manual';entry.taxPayable=entry.amount;entry.taxPaid=entry.amount;entry.taxPeriod=entry.period;entry.notes=entry.description}setBusy('manualBtn',true,'Menyimpan...');google.script.run.withSuccessHandler(res=>{setBusy('manualBtn',false,'Simpan & Hitung KPI');setStatus('manualStatus','Tersimpan ke '+res.sheetName+'. Period: '+res.period+'. KPI dihitung ulang.','ok');if(res.period)document.getElementById('periodInput').value=res.period;loadDashboard()}).withFailureHandler(err=>{setBusy('manualBtn',false,'Simpan & Hitung KPI');setStatus('manualStatus','Gagal simpan: '+(err.message||err),'bad')}).saveDefaultManualClinicEntry(entry)}\n
+    window.onload=function(){updateManualHelp();loadDashboard()};
   </script>
 </body>
 </html>
