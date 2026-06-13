@@ -41,7 +41,7 @@
   </div>
   <script>
     let chart;
-    function rupiah(value){const n=Number(value||0),abs=Math.abs(n),sign=n<0?'-':'';if(abs>=1e9)return sign+'Rp'+(abs/1e9).toFixed(1).replace('.0','')+' M';if(abs>=1e6)return sign+'Rp'+(abs/1e6).toFixed(1).replace('.0','')+' jt';return sign+'Rp'+abs.toLocaleString('id-ID')}
+    function rupiah(value){const n=Number(value||0),abs=Math.abs(n),sign=n<0?'-':'';return sign+'Rp'+abs.toLocaleString('id-ID')}
     function pct(value){if(value===null||value===undefined||value==='')return'-';return(Number(value)*100).toFixed(1).replace('.0','')+'%'}
     function setText(id,text){document.getElementById(id).textContent=text}
     function setBusy(id,busy,text){const el=document.getElementById(id);el.disabled=busy;if(text)el.textContent=text}

@@ -35,8 +35,13 @@
         <button id="nav-manual" data-permission="manualInput" onclick="showView('manual')">Input Transaksi</button>
         <button id="nav-transactions" class="subnav" data-permission="manualInput" onclick="showView('transactions')">Detail List Transaksi</button>
         <button id="nav-reports" data-permission="viewReports" onclick="showView('reports')">Laporan Keuangan</button>
-        <button id="nav-quality" data-permission="viewQuality" onclick="showView('quality')">Data Quality</button>
-        <button id="nav-alerts" data-permission="viewAlerts" onclick="showView('alerts')">Alert</button>
+        <button id="nav-reports-profit" class="subnav" data-permission="viewReports" onclick="showView('reports-profit')">Laba Rugi</button>
+        <button id="nav-reports-cash" class="subnav" data-permission="viewReports" onclick="showView('reports-cash')">Arus Kas</button>
+        <button id="nav-reports-lra" class="subnav" data-permission="viewReports" onclick="showView('reports-lra')">LRA</button>
+        <button id="nav-reports-balance" class="subnav" data-permission="viewReports" onclick="showView('reports-balance')">Neraca</button>
+        <button id="nav-reports-tax" class="subnav" data-permission="viewReports" onclick="showView('reports-tax')">Pajak</button>
+        <button id="nav-reports-receivable" class="subnav" data-permission="viewReports" onclick="showView('reports-receivable')">Piutang & Utang</button>
+        <button id="nav-reports-coa" class="subnav" data-permission="viewReports" onclick="showView('reports-coa')">COA & Rasio</button>
       </nav>
       <div class="user-card"><b id="authUser">Memeriksa akses...</b><span id="authEmail">-</span><br><span class="role-pill" id="authRole">Loading</span></div>
       <div class="nav-note">Ringkas untuk owner, cukup detail untuk admin finance. Data masuk, KPI dihitung, laporan siap dibaca.</div>
@@ -57,6 +62,10 @@
           <section class="two-grid">
             <div class="card"><div class="section-head"><div><h2 class="section-title">Alert Prioritas</h2><div class="muted">Sinyal yang perlu dilihat owner hari ini.</div></div><span class="ai-badge">Live KPI</span></div><div id="dashboardAlerts"></div></div>
             <div class="card"><div class="section-head"><div><h2 class="section-title">Analisa AI</h2><div class="muted">Ringkasan manajemen berbasis KPI dan data yang tersedia.</div></div><span class="ai-badge">POC</span></div><div id="aiAnalysis"></div></div>
+          </section>
+          <section class="two-grid">
+            <div class="card"><div class="section-head"><div><h2 class="section-title">Data Quality</h2><div class="muted">Warning data yang bisa memengaruhi akurasi KPI dan laporan.</div></div><span class="ai-badge">Data Control</span></div><div id="dataQuality"></div></div>
+            <div class="card"><div class="section-head"><div><h2 class="section-title">Alert Aktif</h2><div class="muted">Alert bisnis terbuka dari warehouse dan analisa KPI.</div></div><span class="ai-badge">Business Alerts</span></div><div id="alerts"></div></div>
           </section>
           <section class="two-grid">
             <div class="card"><h2 class="section-title">Komposisi Pendapatan</h2><div id="revenueBreakdown"></div></div>
@@ -158,43 +167,68 @@
         </section>
 
         <section id="view-reports" class="view">
-          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Laporan Keuangan</h1><div class="sub">Format manajemen yang familiar di Indonesia: Laba Rugi, Arus Kas, Posisi Keuangan, dan Rekap Pajak.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh Laporan</button></div></div>
-          <section class="card alert"><b>Catatan pajak & akuntansi</b><br><span class="empty">Ini laporan manajemen POC. Final SPT/laporan resmi tetap perlu validasi konsultan pajak/akuntan sesuai status badan usaha, PKP/non-PKP, dan regulasi terbaru.</span></section>
-          <section class="two-grid">
-            <div class="card"><h2 class="section-title">Laporan Laba Rugi</h2><div id="reportProfitLoss"></div></div>
-            <div class="card"><h2 class="section-title">Arus Kas Ringkas</h2><div id="reportCashFlow"></div></div>
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Laporan Keuangan</h1><div class="sub">Pusat laporan manajemen klinik: Laba Rugi, Arus Kas, LRA, Neraca, Pajak, Piutang/Utang, COA, dan rasio.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh Laporan</button></div></div>
+          <section class="card alert"><b>Catatan pajak & akuntansi</b><br><span class="empty" id="reportDisclaimer">Ini laporan manajemen POC. Final SPT/laporan resmi tetap perlu validasi konsultan pajak/akuntan sesuai status badan usaha, PKP/non-PKP, dan regulasi terbaru.</span></section>
+          <section class="grid">
+            <div class="card metric good"><div class="name">Laba Rugi</div><div class="num" id="reportKpiProfit">-</div><div class="hint">Laba setelah pajak</div></div>
+            <div class="card metric info"><div class="name">Kas Bersih</div><div class="num" id="reportKpiCash">-</div><div class="hint">Mutasi kas periode</div></div>
+            <div class="card metric warn"><div class="name">Total Aset</div><div class="num" id="reportKpiAssets">-</div><div class="hint">Neraca estimasi</div></div>
+            <div class="card metric warn"><div class="name">Utang Pajak</div><div class="num" id="reportKpiTax">-</div><div class="hint">Outstanding pajak</div></div>
           </section>
-          <section class="two-grid">
-            <div class="card"><h2 class="section-title">Posisi Keuangan Sederhana</h2><div id="reportPosition"></div></div>
-            <div class="card"><h2 class="section-title">Rekap Pajak</h2><div id="reportTax"></div></div>
-          </section>
+          <section class="card"><h2 class="section-title">Daftar Sub Laporan</h2><div class="grid"><button class="secondary" onclick="showView('reports-profit')">Laba Rugi</button><button class="secondary" onclick="showView('reports-cash')">Arus Kas</button><button class="secondary" onclick="showView('reports-lra')">LRA</button><button class="secondary" onclick="showView('reports-balance')">Neraca</button><button class="secondary" onclick="showView('reports-tax')">Pajak</button><button class="secondary" onclick="showView('reports-receivable')">Piutang & Utang</button><button class="secondary" onclick="showView('reports-coa')">COA & Rasio</button></div></section>
         </section>
 
-        <section id="view-quality" class="view">
-          <div class="top"><div><div class="eyebrow">Data Control</div><h1>Data Quality</h1><div class="sub">Pantau data yang belum lengkap, salah format, atau perlu dicek admin.</div></div><div class="top-actions"><button class="primary" onclick="loadDashboard()">Refresh</button></div></div>
-          <section class="card"><h2 class="section-title">Data Quality Warning</h2><div id="dataQuality"></div></section>
+        <section id="view-reports-profit" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Laporan Laba Rugi</h1><div class="sub">Pendapatan, HPP obat/BMHP, beban operasional, EBITDA estimasi, pajak, dan laba bersih.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">Laporan Laba Rugi</h2><div id="reportProfitLoss"></div></section>
         </section>
 
-        <section id="view-alerts" class="view">
-          <div class="top"><div><div class="eyebrow">Business Alerts</div><h1>Alert Klinik</h1><div class="sub">Sinyal penting untuk owner: revenue, biaya, margin, dan kelengkapan data.</div></div><div class="top-actions"><button class="primary" onclick="loadDashboard()">Refresh</button></div></div>
-          <section class="card"><h2 class="section-title">Alert Aktif</h2><div id="alerts"></div></section>
+        <section id="view-reports-cash" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Laporan Arus Kas</h1><div class="sub">Kas masuk pasien/penjamin, kas keluar operasional, pajak dibayar, dan mutasi kas bersih.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">Arus Kas</h2><div id="reportCashFlow"></div></section>
         </section>
+
+        <section id="view-reports-lra" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>LRA — Laporan Realisasi Anggaran</h1><div class="sub">Realisasi pendapatan, belanja/HPP, beban operasional, surplus/defisit, dan pajak. Target budget bisa ditambahkan fase berikutnya.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">LRA / Realisasi Operasional</h2><div id="reportLra"></div></section>
+        </section>
+
+        <section id="view-reports-balance" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Neraca / Posisi Keuangan</h1><div class="sub">Aset, liabilitas, dan ekuitas estimasi berbasis data operasional klinik yang tersedia.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">Neraca Estimasi</h2><div id="reportBalance"></div></section>
+        </section>
+
+        <section id="view-reports-tax" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Rekap Pajak</h1><div class="sub">Ringkasan pajak terutang, dibayar, outstanding, status dokumen, dan catatan rekonsiliasi.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">Rekap Pajak</h2><div id="reportTax"></div></section>
+        </section>
+
+        <section id="view-reports-receivable" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Piutang & Utang</h1><div class="sub">Piutang pasien/penjamin/BPJS dan utang pajak/supplier yang terbaca dari data klinik.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="two-grid"><div class="card"><h2 class="section-title">Piutang</h2><div id="reportReceivable"></div></div><div class="card"><h2 class="section-title">Utang</h2><div id="reportPayable"></div></div></section>
+        </section>
+
+        <section id="view-reports-coa" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>COA & Rasio Keuangan</h1><div class="sub">Ringkasan akun COA, mapping laporan, gross margin, net margin, expense ratio, dan collection rate.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="two-grid"><div class="card"><h2 class="section-title">Ringkasan COA</h2><div id="reportCoa"></div></div><div class="card"><h2 class="section-title">Rasio Keuangan</h2><div id="reportRatios"></div></div></section>
+        </section>
+
       </div>
     </main>
   </div>
   <script>
     let chart;
     let authState={permissions:{}};
-    const viewIds=['dashboard','upload','manual','transactions','reports','quality','alerts'];
-    function rupiah(value){const n=Number(value||0),abs=Math.abs(n),sign=n<0?'-':'';if(abs>=1e9)return sign+'Rp'+(abs/1e9).toFixed(1).replace('.0','')+' M';if(abs>=1e6)return sign+'Rp'+(abs/1e6).toFixed(1).replace('.0','')+' jt';return sign+'Rp'+abs.toLocaleString('id-ID')}
+    const viewIds=['dashboard','upload','manual','transactions','reports','reports-profit','reports-cash','reports-lra','reports-balance','reports-tax','reports-receivable','reports-coa'];
+    function rupiah(value){const n=Number(value||0),abs=Math.abs(n),sign=n<0?'-':'';return sign+'Rp'+abs.toLocaleString('id-ID')}
     function pct(value){if(value===null||value===undefined||value==='')return'-';return(Number(value)*100).toFixed(1).replace('.0','')+'%'}
     function setText(id,text){document.getElementById(id).textContent=text}
     function setBusy(id,busy,text){const el=document.getElementById(id);if(!el)return;el.disabled=busy;if(text)el.textContent=text}
     function can(permission){return !!(authState&&authState.permissions&&authState.permissions[permission])}
-    function permissionForView(name){return ({dashboard:'viewDashboard',upload:'uploadData',manual:'manualInput',transactions:'manualInput',reports:'viewReports',quality:'viewQuality',alerts:'viewAlerts'})[name]||'viewDashboard'}
-    function applyAuthState(state){authState=state||{permissions:{}};const banner=document.getElementById('authBanner');const msg=document.getElementById('authMessage');setText('authUser',authState.userName||authState.email||'Belum terautentikasi');setText('authEmail',authState.email||authState.message||'-');setText('authRole',authState.roleLabel||authState.role||'No Access');if(!authState.ok){banner.style.display='block';msg.textContent=authState.message||'Akses tidak valid.'}else{banner.style.display='none';msg.textContent=''}document.querySelectorAll('[data-permission]').forEach(el=>{const allowed=can(el.getAttribute('data-permission'));el.classList.toggle('locked',!allowed);el.disabled=!allowed});document.getElementById('view-upload').classList.toggle('hidden-by-role',!can('uploadData'));document.getElementById('view-manual').classList.toggle('hidden-by-role',!can('manualInput'));document.getElementById('view-transactions').classList.toggle('hidden-by-role',!can('manualInput'));document.getElementById('view-reports').classList.toggle('hidden-by-role',!can('viewReports'));document.getElementById('view-quality').classList.toggle('hidden-by-role',!can('viewQuality'));document.getElementById('view-alerts').classList.toggle('hidden-by-role',!can('viewAlerts'));document.getElementById('uploadBtn').disabled=!can('uploadData');document.getElementById('manualBtn').disabled=!can('manualInput')}
+    function permissionForView(name){return ({dashboard:'viewDashboard',upload:'uploadData',manual:'manualInput',transactions:'manualInput',reports:'viewReports','reports-profit':'viewReports','reports-cash':'viewReports','reports-lra':'viewReports','reports-balance':'viewReports','reports-tax':'viewReports','reports-receivable':'viewReports','reports-coa':'viewReports'})[name]||'viewDashboard'}
+    function applyAuthState(state){authState=state||{permissions:{}};const banner=document.getElementById('authBanner');const msg=document.getElementById('authMessage');setText('authUser',authState.userName||authState.email||'Belum terautentikasi');setText('authEmail',authState.email||authState.message||'-');setText('authRole',authState.roleLabel||authState.role||'No Access');if(!authState.ok){banner.style.display='block';msg.textContent=authState.message||'Akses tidak valid.'}else{banner.style.display='none';msg.textContent=''}document.querySelectorAll('[data-permission]').forEach(el=>{const allowed=can(el.getAttribute('data-permission'));el.classList.toggle('locked',!allowed);el.disabled=!allowed});document.getElementById('view-upload').classList.toggle('hidden-by-role',!can('uploadData'));document.getElementById('view-manual').classList.toggle('hidden-by-role',!can('manualInput'));document.getElementById('view-transactions').classList.toggle('hidden-by-role',!can('manualInput'));viewIds.filter(id=>id.indexOf('reports')===0).forEach(id=>{document.getElementById('view-'+id).classList.toggle('hidden-by-role',!can('viewReports'))});document.getElementById('uploadBtn').disabled=!can('uploadData');document.getElementById('manualBtn').disabled=!can('manualInput')}
     function loadAuthState(){google.script.run.withSuccessHandler(state=>{applyAuthState(state);if(state&&state.ok){setManualDefaults();if(can('manualInput'))loadManualOptions();loadDashboard()}}).withFailureHandler(err=>{applyAuthState({ok:false,authenticated:false,message:err.message||String(err),permissions:{}})}).getDefaultAuthState()}
-    function showView(name){const perm=permissionForView(name);if(!can(perm)){alert('Role Anda tidak punya akses ke menu ini. Hubungi owner/admin untuk update USER_ACCESS.');return}viewIds.forEach(id=>{document.getElementById('view-'+id).classList.toggle('active',id===name);document.getElementById('nav-'+id).classList.toggle('active',id===name)});if(name==='dashboard'&&!chart)loadDashboard();if(name==='reports')loadReports();if(name==='transactions')loadTransactions()}
+    function showView(name){const perm=permissionForView(name);if(!can(perm)){alert('Role Anda tidak punya akses ke menu ini. Hubungi owner/admin untuk update USER_ACCESS.');return}viewIds.forEach(id=>{document.getElementById('view-'+id).classList.toggle('active',id===name);document.getElementById('nav-'+id).classList.toggle('active',id===name)});if(name==='dashboard'&&!chart)loadDashboard();if(name.indexOf('reports')===0)loadReports();if(name==='transactions')loadTransactions()}
     function loadDashboard(){setBusy('refreshBtn',true,'Loading...');const p=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(render).withFailureHandler(err=>{alert(err.message||err);setBusy('refreshBtn',false,'Refresh')}).getDefaultDashboardPayload(p)}
     function uploadFile(){if(!can('uploadData')){alert('Role Anda tidak punya akses upload data.');return}const file=document.getElementById('fileInput').files[0];if(!file){alert('Pilih file Excel/CSV dulu.');return}setBusy('uploadBtn',true,'Uploading...');setText('uploadStatus','Membaca file...');const reader=new FileReader();reader.onload=function(){const period=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(res=>{if(res&&res.ok===false){setStatus('uploadStatus',res.message||'Upload ditolak.','bad');setBusy('uploadBtn',false,'Upload & Hitung');return}setStatus('uploadStatus','Upload sukses. Rows written: '+res.rowsWritten+', failed: '+res.rowsFailed+'. Period: '+res.period,'ok');setBusy('uploadBtn',false,'Upload & Hitung');if(res.period)document.getElementById('periodInput').value=res.period;loadDashboard()}).withFailureHandler(err=>{setStatus('uploadStatus','Upload gagal: '+(err.message||err),'bad');setBusy('uploadBtn',false,'Upload & Hitung')}).uploadPocFile(reader.result,file.name,file.type,{period:period||undefined})};reader.readAsDataURL(file)}
     function setStatus(id,text,cls){const el=document.getElementById(id);el.textContent=text;el.className='status '+(cls||'')}
@@ -272,7 +306,9 @@
 
     function renderReportRows(id,rows){const el=document.getElementById(id);clearNode(el);if(!rows||!rows.length){appendEmpty(el,'Belum ada data laporan.');return}rows.forEach(r=>{const row=document.createElement('div');row.className='row';const left=document.createElement('div');const cat=document.createElement('div');cat.className='cat';cat.textContent=r.label||r.taxType||'-';const note=document.createElement('div');note.className='empty';note.textContent=r.note||r.notes||r.documentStatus||'';const amt=document.createElement('div');amt.className='amt';amt.textContent=rupiah(r.amount!==undefined?r.amount:(r.taxPayable||0));left.appendChild(cat);left.appendChild(note);row.appendChild(left);row.appendChild(amt);el.appendChild(row)})}
     function loadReports(){if(!can('viewReports')){alert('Role Anda tidak punya akses laporan keuangan.');return}const p=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(renderReports).withFailureHandler(err=>alert(err.message||err)).getDefaultFinancialReportPayload(p)}
-    function renderReports(payload){renderReportRows('reportProfitLoss',payload.labaRugi||[]);renderReportRows('reportCashFlow',payload.arusKas||[]);renderReportRows('reportPosition',payload.posisiKeuangan||[]);renderReportRows('reportTax',(payload.pajak||[]).map(t=>({label:t.taxType,amount:t.taxPayable,note:'Tarif '+pct(t.taxRate)+' • dibayar '+rupiah(t.taxPaid)+' • outstanding '+rupiah(t.taxOutstanding)+' • '+(t.notes||'')})))}
+    function renderRatioRows(id,rows){const el=document.getElementById(id);clearNode(el);if(!rows||!rows.length){appendEmpty(el,'Belum ada data rasio.');return}rows.forEach(r=>{const row=document.createElement('div');row.className='row';const left=document.createElement('div');const cat=document.createElement('div');cat.className='cat';cat.textContent=r.label||'-';const note=document.createElement('div');note.className='empty';note.textContent=(r.ratio===null||r.ratio===undefined?'Rasio belum tersedia':pct(r.ratio))+' • '+(r.note||'');const amt=document.createElement('div');amt.className='amt';amt.textContent=rupiah(r.amount||0);left.appendChild(cat);left.appendChild(note);row.appendChild(left);row.appendChild(amt);el.appendChild(row)})}
+    function amountFrom(rows,label){const hit=(rows||[]).find(r=>String(r.label||'').toLowerCase().indexOf(label)>=0);return hit?hit.amount:0}
+    function renderReports(payload){payload=payload||{};setText('reportDisclaimer',payload.disclaimer||'Laporan manajemen POC; final tetap perlu validasi profesional.');renderReportRows('reportProfitLoss',payload.labaRugi||[]);renderReportRows('reportCashFlow',payload.arusKas||[]);renderReportRows('reportLra',payload.lra||[]);renderReportRows('reportBalance',payload.neraca||payload.posisiKeuangan||[]);renderReportRows('reportTax',(payload.pajak||[]).map(t=>({label:t.taxType,amount:t.taxPayable,note:'Tarif '+pct(t.taxRate)+' • dibayar '+rupiah(t.taxPaid)+' • outstanding '+rupiah(t.taxOutstanding)+' • '+(t.notes||'')})));renderReportRows('reportReceivable',payload.piutang||[]);renderReportRows('reportPayable',payload.utang||[]);renderReportRows('reportCoa',payload.coaSummary||[]);renderRatioRows('reportRatios',payload.rasio||[]);setText('reportKpiProfit',rupiah(amountFrom(payload.labaRugi,'laba setelah pajak')));setText('reportKpiCash',rupiah(amountFrom(payload.arusKas,'kas bersih')));setText('reportKpiAssets',rupiah(amountFrom(payload.neraca,'total aset')));setText('reportKpiTax',rupiah((payload.pajak||[]).reduce((a,t)=>a+Number(t.taxOutstanding||0),0)))}
     function loadTransactions(){if(!can('manualInput')){alert('Role Anda tidak punya akses detail transaksi.');return}setManualDefaults();const type=val('transactionType')||'all';const period=val('transactionPeriod')||document.getElementById('periodInput').value||currentMonth();setStatus('transactionStatus','Memuat transaksi...','');google.script.run.withSuccessHandler(renderTransactions).withFailureHandler(err=>setStatus('transactionStatus','Gagal memuat transaksi: '+(err.message||err),'bad')).getDefaultTransactionListPayload(type,period,100)}
     function renderTransactions(payload){const body=document.getElementById('transactionRows');clearNode(body);const rows=(payload&&payload.rows)||[];setText('transactionSummary',(payload&&payload.totalCount!==undefined?payload.totalCount:rows.length)+' transaksi ditemukan untuk '+((payload&&payload.period)||'-'));setStatus('transactionStatus',rows.length?'Menampilkan '+rows.length+' transaksi terbaru.':'Belum ada transaksi pada filter ini.',rows.length?'ok':'');if(!rows.length){const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=7;td.className='empty';td.textContent='Belum ada transaksi. Coba input transaksi baru atau upload data.';tr.appendChild(td);body.appendChild(tr);return}rows.forEach(r=>{const tr=document.createElement('tr');const cells=[r.date||'-',r.type||'-',r.category||'-',r.description||'-',r.amount?rupiah(r.amount):'-',[r.doctor,r.poli].filter(Boolean).join(' / ')||r.payerType||'-',r.status||'-'];cells.forEach((text,i)=>{const td=document.createElement('td');if(i===1){const chip=document.createElement('span');chip.className='type-chip';chip.textContent=text;td.appendChild(chip)}else if(i===4){td.className=Number(r.amount||0)<0?'amount-neg':'amount-pos';td.textContent=text}else{td.textContent=text}tr.appendChild(td)});body.appendChild(tr)})}
     let manualOptions={};
