@@ -4,48 +4,62 @@
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI Clinic Owner Copilot POC</title>
+  <title>AI Clinic Owner Copilot</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
-    :root{--bg:#f6f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--green:#059669;--red:#dc2626;--amber:#d97706;--blue:#2563eb;--line:#e5e7eb;--nav:#0f172a;--navText:#cbd5e1;--navActive:#2563eb}*{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}.app{min-height:100vh;display:grid;grid-template-columns:248px 1fr}.sidebar{background:var(--nav);color:white;padding:18px 14px;position:sticky;top:0;height:100vh}.brand{font-size:16px;font-weight:900;line-height:1.2;margin:4px 8px 18px}.brand span{display:block;color:var(--navText);font-size:12px;font-weight:600;margin-top:4px}.nav{display:grid;gap:8px}.nav button{width:100%;text-align:left;border:0;background:transparent;color:var(--navText);border-radius:12px;padding:11px 12px;font-weight:850;cursor:pointer}.nav button:hover,.nav button.active{background:var(--navActive);color:white}.nav-note{color:#94a3b8;font-size:12px;line-height:1.45;margin:18px 8px 0}.main{padding:18px}.wrap{max-width:980px;margin:0 auto}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}h1{font-size:24px;line-height:1.2;margin:0 0 4px}.sub,.muted{color:var(--muted);font-size:13px}.card{background:var(--card);border-radius:18px;padding:16px;box-shadow:0 8px 24px rgba(15,23,42,.06);margin-bottom:12px}.hero{background:linear-gradient(135deg,#111827,#1d4ed8);color:white}.label{font-size:13px;color:rgba(255,255,255,.75);margin-bottom:8px}.hero .value{font-size:38px;font-weight:850;letter-spacing:-.04em}.hero .note{margin-top:8px;font-size:13px;color:rgba(255,255,255,.82)}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.two-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.metric .name{color:var(--muted);font-size:12px;margin-bottom:8px}.metric .num{font-size:20px;font-weight:850;letter-spacing:-.02em}.metric .hint{margin-top:4px;font-size:12px;color:var(--muted)}.section-title{font-size:16px;font-weight:850;margin:0 0 12px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #eef2f7}.row:first-child{border-top:0;padding-top:0}.row .cat{font-size:13px;color:#374151;text-transform:capitalize}.row .amt{font-size:13px;font-weight:850}.alert{border-left:4px solid var(--amber);background:#fffbeb;box-shadow:none;margin:0 0 10px;padding:12px}.alert.high,.alert.critical{border-left-color:var(--red);background:#fef2f2}.empty{color:var(--muted);font-size:13px}.btn,button.primary{border:0;background:#2563eb;color:white;border-radius:12px;padding:10px 12px;font-weight:850;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}.btn.secondary,button.secondary{background:#111827}.btn.ghost{background:#eef2ff;color:#1d4ed8}.btn:disabled,button:disabled{opacity:.55;cursor:not-allowed}input,select{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:white}.upload-grid{display:grid;grid-template-columns:1fr 170px 170px;gap:10px;align-items:end}.status{font-size:13px;margin-top:8px}.ok{color:var(--green)}.bad{color:var(--red)}.view{display:none}.view.active{display:block}.template-list{display:grid;gap:8px;margin:10px 0 0;padding-left:18px}.template-box{border:1px dashed #bfdbfe;background:#eff6ff;border-radius:14px;padding:14px;margin-top:12px}.pill{display:inline-block;border-radius:999px;background:#e0f2fe;color:#075985;padding:4px 9px;font-size:12px;font-weight:800;margin:2px 4px 2px 0}@media(max-width:860px){.app{grid-template-columns:1fr}.sidebar{height:auto;position:relative}.nav{grid-template-columns:repeat(2,1fr)}.main{padding:12px}.grid,.two-grid{grid-template-columns:1fr 1fr}.upload-grid{grid-template-columns:1fr}.hero .value{font-size:30px}.card{border-radius:16px;padding:14px}}@media(max-width:560px){.grid,.two-grid,.nav{grid-template-columns:1fr}.top{display:block}.top-actions{margin-top:10px}h1{font-size:21px}}
+    :root{
+      --bg:#f3f6fb;--surface:#ffffff;--surface-2:#f8fafc;--text:#0f172a;--muted:#64748b;--soft:#94a3b8;
+      --line:#e2e8f0;--line-strong:#cbd5e1;--primary:#0f766e;--primary-2:#115e59;--primary-soft:#ccfbf1;
+      --blue:#2563eb;--green:#059669;--red:#dc2626;--amber:#d97706;--shadow:0 18px 50px rgba(15,23,42,.08);
+      --nav:#07111f;--nav-2:#0f1b2d;--navText:#aebed0;--navActive:#e7f8f5;
+    }
+    *{box-sizing:border-box}html{background:var(--bg)}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at top left,#e0f2fe 0,#f3f6fb 34%,#eef2f7 100%);color:var(--text);font-size:14px}.app{min-height:100vh;display:grid;grid-template-columns:280px minmax(0,1fr)}
+    .sidebar{background:linear-gradient(180deg,var(--nav),var(--nav-2));color:white;padding:22px 16px;position:sticky;top:0;height:100vh;border-right:1px solid rgba(255,255,255,.08)}
+    .brand{display:flex;gap:12px;align-items:center;margin:4px 8px 26px}.brand-mark{width:38px;height:38px;border-radius:13px;background:linear-gradient(135deg,#2dd4bf,#0f766e);display:grid;place-items:center;font-weight:900;color:#ecfeff;box-shadow:0 12px 28px rgba(45,212,191,.28)}.brand-title{font-size:15px;font-weight:850;line-height:1.15}.brand-title span{display:block;color:var(--navText);font-size:11px;font-weight:650;margin-top:5px;letter-spacing:.04em;text-transform:uppercase}
+    .nav{display:grid;gap:6px}.nav button{width:100%;text-align:left;border:0;background:transparent;color:var(--navText);border-radius:14px;padding:12px 13px;font-weight:760;cursor:pointer;display:flex;align-items:center;gap:10px;letter-spacing:.01em}.nav button::before{content:"";width:8px;height:8px;border-radius:999px;background:#334155}.nav button:hover{background:rgba(255,255,255,.06);color:#fff}.nav button.active{background:var(--navActive);color:#0f766e;box-shadow:0 10px 22px rgba(0,0,0,.18)}.nav button.active::before{background:#0f766e}.nav-note{color:#8da2ba;font-size:12px;line-height:1.55;margin:22px 8px 0;padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.035)}
+    .main{padding:28px}.wrap{max-width:1180px;margin:0 auto}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px}.top-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.eyebrow{font-size:12px;color:var(--primary);font-weight:850;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}h1{font-size:30px;line-height:1.05;margin:0 0 7px;letter-spacing:-.035em}.sub,.muted{color:var(--muted);font-size:13px;line-height:1.55}.view{display:none}.view.active{display:block;animation:fadeIn .18s ease-out}@keyframes fadeIn{from{opacity:.55;transform:translateY(4px)}to{opacity:1;transform:none}}
+    .card{background:rgba(255,255,255,.92);border:1px solid rgba(226,232,240,.9);border-radius:22px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;backdrop-filter:blur(10px)}.card.compact{padding:14px}.hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#0f172a,#134e4a 58%,#0f766e);color:white;padding:24px}.hero:after{content:"";position:absolute;right:-70px;top:-90px;width:260px;height:260px;border-radius:999px;background:rgba(45,212,191,.18)}.label{font-size:12px;color:rgba(255,255,255,.7);font-weight:750;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}.hero .value{font-size:46px;font-weight:900;letter-spacing:-.055em;position:relative}.hero .note{margin-top:10px;font-size:13px;color:rgba(255,255,255,.82);position:relative;max-width:760px}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.two-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.metric{min-height:126px}.metric .name{color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px}.metric .num{font-size:25px;font-weight:900;letter-spacing:-.035em}.metric .hint{margin-top:8px;font-size:12px;color:var(--muted)}.metric.good{border-top:4px solid var(--green)}.metric.warn{border-top:4px solid var(--amber)}.metric.info{border-top:4px solid var(--blue)}.section-title{font-size:16px;font-weight:900;margin:0 0 14px;letter-spacing:-.015em}.row{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:12px 0;border-top:1px solid #edf2f7}.row:first-child{border-top:0;padding-top:0}.row .cat{font-size:13px;color:#1f2937;text-transform:capitalize;font-weight:780}.row .amt{font-size:13px;font-weight:900;white-space:nowrap}.alert{border-left:4px solid var(--amber);background:#fffbeb;box-shadow:none;margin:0 0 10px;padding:14px;border-radius:16px}.alert.high,.alert.critical{border-left-color:var(--red);background:#fff1f2}.empty{color:var(--muted);font-size:13px;line-height:1.5}.btn,button.primary,button.secondary{border:0;border-radius:13px;padding:10px 14px;font-weight:850;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:.15s ease;min-height:40px}.btn,button.primary{background:var(--primary);color:white;box-shadow:0 10px 22px rgba(15,118,110,.22)}button.primary:hover{background:var(--primary-2);transform:translateY(-1px)}.btn.secondary,button.secondary{background:#0f172a;color:white;box-shadow:0 10px 22px rgba(15,23,42,.14)}.btn.ghost{background:#ecfeff;color:#0f766e;box-shadow:none}.btn:disabled,button:disabled{opacity:.55;cursor:not-allowed;transform:none}label{display:block;margin-bottom:6px;font-weight:750}input,select{width:100%;border:1px solid var(--line);border-radius:13px;padding:11px 12px;background:white;color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s}input:focus,select:focus{border-color:#5eead4;box-shadow:0 0 0 4px rgba(45,212,191,.14)}.upload-grid{display:grid;grid-template-columns:1fr 180px 180px;gap:12px;align-items:end}.status{font-size:13px;margin-top:10px}.ok{color:var(--green);font-weight:750}.bad{color:var(--red);font-weight:750}.template-list{display:grid;gap:8px;margin:12px 0 0;padding-left:18px}.template-box{border:1px solid #99f6e4;background:linear-gradient(180deg,#ecfeff,#f0fdfa);border-radius:18px;padding:16px;margin-top:14px}.pill{display:inline-block;border-radius:999px;background:white;color:#0f766e;border:1px solid #99f6e4;padding:5px 10px;font-size:12px;font-weight:850;margin:3px 5px 3px 0}.toolbar-note{font-size:12px;color:var(--soft)}canvas{max-width:100%}
+    @media(max-width:940px){.app{grid-template-columns:1fr}.sidebar{height:auto;position:relative}.brand{margin-bottom:16px}.nav{grid-template-columns:repeat(3,1fr)}.main{padding:18px}.grid,.two-grid{grid-template-columns:1fr 1fr}.upload-grid{grid-template-columns:1fr}.hero .value{font-size:36px}.card{border-radius:18px;padding:15px}.nav-note{display:none}}
+    @media(max-width:620px){.grid,.two-grid,.nav{grid-template-columns:1fr}.top{display:block}.top-actions{margin-top:12px}h1{font-size:24px}.hero .value{font-size:31px}.main{padding:12px}}
   </style>
 </head>
 <body>
   <div class="app">
     <aside class="sidebar">
-      <div class="brand">AI Clinic Owner Copilot<span>POC Revenue & Profit</span></div>
+      <div class="brand"><div class="brand-mark">AC</div><div class="brand-title">AI Clinic Copilot<span>Owner Finance Suite</span></div></div>
       <nav class="nav" aria-label="Menu utama">
-        <button id="nav-dashboard" class="active" onclick="showView('dashboard')">📊 Dashboard</button>
-        <button id="nav-upload" onclick="showView('upload')">⬆️ Upload Data</button>
-        <button id="nav-manual" onclick="showView('manual')">✍️ Input Manual</button>
-        <button id="nav-reports" onclick="showView('reports')">📑 Laporan Keuangan</button>
-        <button id="nav-quality" onclick="showView('quality')">✅ Data Quality</button>
-        <button id="nav-alerts" onclick="showView('alerts')">🔔 Alert</button>
+        <button id="nav-dashboard" class="active" onclick="showView('dashboard')">Dashboard</button>
+        <button id="nav-upload" onclick="showView('upload')">Upload Data</button>
+        <button id="nav-manual" onclick="showView('manual')">Input Manual</button>
+        <button id="nav-reports" onclick="showView('reports')">Laporan Keuangan</button>
+        <button id="nav-quality" onclick="showView('quality')">Data Quality</button>
+        <button id="nav-alerts" onclick="showView('alerts')">Alert</button>
       </nav>
-      <div class="nav-note">Upload, input manual, laporan keuangan, dan dashboard dipisah supaya owner/admin lebih mudah pakai.</div>
+      <div class="nav-note">Ringkas untuk owner, cukup detail untuk admin finance. Data masuk, KPI dihitung, laporan siap dibaca.</div>
     </aside>
 
     <main class="main">
       <div class="wrap">
         <section id="view-dashboard" class="view active">
-          <div class="top"><div><h1>Dashboard Revenue & Profit</h1><div class="sub" id="subtitle">Loading data...</div></div><div class="top-actions"><button id="refreshBtn" class="primary" onclick="loadDashboard()">Refresh</button><button class="secondary" onclick="showView('upload')">Upload Data</button></div></div>
+          <div class="top"><div><div class="eyebrow">Owner Dashboard</div><h1>Kinerja Klinik Bulan Ini</h1><div class="sub" id="subtitle">Memuat ringkasan keuangan...</div></div><div class="top-actions"><button id="refreshBtn" class="primary" onclick="loadDashboard()">Refresh</button><button class="secondary" onclick="showView('upload')">Upload Data</button></div></div>
           <section class="card hero"><div class="label" id="profitLabel">Net Profit</div><div class="value" id="netProfit">-</div><div class="note" id="profitNote">-</div></section>
           <section class="grid">
-            <div class="card metric"><div class="name">Revenue</div><div class="num" id="revenue">-</div><div class="hint" id="revenueGrowth">Growth -</div></div>
-            <div class="card metric"><div class="name">Profit</div><div class="num" id="profitMini">-</div><div class="hint" id="profitGrowth">Growth -</div></div>
-            <div class="card metric"><div class="name">Cost</div><div class="num" id="costs">-</div><div class="hint">Total biaya</div></div>
-            <div class="card metric"><div class="name">Margin</div><div class="num" id="margin">-</div><div class="hint">Net Profit / Revenue</div></div>
+            <div class="card metric good"><div class="name">Revenue</div><div class="num" id="revenue">-</div><div class="hint" id="revenueGrowth">Growth -</div></div>
+            <div class="card metric good"><div class="name">Profit</div><div class="num" id="profitMini">-</div><div class="hint" id="profitGrowth">Growth -</div></div>
+            <div class="card metric warn"><div class="name">Cost</div><div class="num" id="costs">-</div><div class="hint">Total biaya</div></div>
+            <div class="card metric info"><div class="name">Margin</div><div class="num" id="margin">-</div><div class="hint">Net Profit / Revenue</div></div>
           </section>
           <section class="two-grid">
-            <div class="card"><h2 class="section-title">Revenue Breakdown</h2><div id="revenueBreakdown"></div></div>
-            <div class="card"><h2 class="section-title">Cost Breakdown</h2><div id="costBreakdown"></div></div>
+            <div class="card"><h2 class="section-title">Komposisi Pendapatan</h2><div id="revenueBreakdown"></div></div>
+            <div class="card"><h2 class="section-title">Komposisi Biaya</h2><div id="costBreakdown"></div></div>
           </section>
-          <section class="card"><h2 class="section-title">Revenue vs Profit Harian</h2><canvas id="financeChart" height="170"></canvas><div class="empty" id="chartEmpty" style="display:none">Trend harian belum tersedia.</div></section>
+          <section class="card"><h2 class="section-title">Tren Revenue, Biaya, dan Profit Harian</h2><canvas id="financeChart" height="170"></canvas><div class="empty" id="chartEmpty" style="display:none">Trend harian belum tersedia.</div></section>
         </section>
 
         <section id="view-upload" class="view">
-          <div class="top"><div><h1>Upload Data Klinik</h1><div class="sub">Upload Excel/CSV SIM klinik, lalu hitung KPI untuk periode yang dipilih.</div></div><div class="top-actions"><button class="secondary" onclick="showView('dashboard')">Lihat Dashboard</button></div></div>
+          <div class="top"><div><div class="eyebrow">Data Intake</div><h1>Upload Data Klinik</h1><div class="sub">Masukkan data dari SIM klinik atau template Excel agar dashboard dan laporan terhitung otomatis.</div></div><div class="top-actions"><button class="secondary" onclick="showView('dashboard')">Lihat Dashboard</button></div></div>
           <section class="card">
             <h2 class="section-title">Template Excel Data Klinik</h2>
             <div class="muted">Download template ini, isi sheet yang relevan, lalu upload kembali. Minimal untuk dashboard profit: <b>PENDAPATAN</b> dan <b>BIAYA</b>.</div>
@@ -66,12 +80,12 @@
               <div><label class="muted">Periode KPI</label><input id="periodInput" placeholder="YYYY-MM"></div>
               <div><button id="uploadBtn" class="primary" onclick="uploadFile()">Upload & Hitung</button></div>
             </div>
-            <div class="status" id="uploadStatus">AI belum diaktifkan di POC ini.</div>
+            <div class="status" id="uploadStatus">Siap menerima file. Data sensitif pasien tidak diperlukan.</div>
           </section>
         </section>
 
         <section id="view-manual" class="view">
-          <div class="top"><div><h1>Input Data Manual</h1><div class="sub">Alternatif jika klinik belum punya file SIM/Excel. Input satu transaksi per kali simpan.</div></div><div class="top-actions"><button class="secondary" onclick="showView('dashboard')">Lihat Dashboard</button></div></div>
+          <div class="top"><div><div class="eyebrow">Manual Entry</div><h1>Input Data Manual</h1><div class="sub">Untuk klinik yang belum punya export data. Input cepat per transaksi, lalu sistem menghitung KPI ulang.</div></div><div class="top-actions"><button class="secondary" onclick="showView('dashboard')">Lihat Dashboard</button></div></div>
           <section class="card">
             <h2 class="section-title">Form Input Manual</h2>
             <div class="two-grid">
@@ -94,7 +108,7 @@
         </section>
 
         <section id="view-reports" class="view">
-          <div class="top"><div><h1>Laporan Keuangan</h1><div class="sub">Laporan standar Indonesia versi manajemen: Laba Rugi, Arus Kas, Posisi Keuangan, dan Pajak.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh Laporan</button></div></div>
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Laporan Keuangan</h1><div class="sub">Format manajemen yang familiar di Indonesia: Laba Rugi, Arus Kas, Posisi Keuangan, dan Rekap Pajak.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh Laporan</button></div></div>
           <section class="card alert"><b>Catatan pajak & akuntansi</b><br><span class="empty">Ini laporan manajemen POC. Final SPT/laporan resmi tetap perlu validasi konsultan pajak/akuntan sesuai status badan usaha, PKP/non-PKP, dan regulasi terbaru.</span></section>
           <section class="two-grid">
             <div class="card"><h2 class="section-title">Laporan Laba Rugi</h2><div id="reportProfitLoss"></div></div>
@@ -107,12 +121,12 @@
         </section>
 
         <section id="view-quality" class="view">
-          <div class="top"><div><h1>Data Quality</h1><div class="sub">Issue validasi dari data import periode aktif.</div></div><div class="top-actions"><button class="primary" onclick="loadDashboard()">Refresh</button></div></div>
+          <div class="top"><div><div class="eyebrow">Data Control</div><h1>Data Quality</h1><div class="sub">Pantau data yang belum lengkap, salah format, atau perlu dicek admin.</div></div><div class="top-actions"><button class="primary" onclick="loadDashboard()">Refresh</button></div></div>
           <section class="card"><h2 class="section-title">Data Quality Warning</h2><div id="dataQuality"></div></section>
         </section>
 
         <section id="view-alerts" class="view">
-          <div class="top"><div><h1>Alert</h1><div class="sub">Peringatan bisnis dari KPI periode aktif.</div></div><div class="top-actions"><button class="primary" onclick="loadDashboard()">Refresh</button></div></div>
+          <div class="top"><div><div class="eyebrow">Business Alerts</div><h1>Alert Klinik</h1><div class="sub">Sinyal penting untuk owner: revenue, biaya, margin, dan kelengkapan data.</div></div><div class="top-actions"><button class="primary" onclick="loadDashboard()">Refresh</button></div></div>
           <section class="card"><h2 class="section-title">Alert Aktif</h2><div id="alerts"></div></section>
         </section>
       </div>
