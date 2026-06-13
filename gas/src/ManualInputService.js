@@ -31,7 +31,7 @@ function saveManualClinicEntryForContext_(context, entry) {
         tenant_id: context.tenantId, clinic_id: context.clinicId, revenue_id: 'rev_' + importId, transaction_id: entry.transactionId || 'trx_' + importId,
         import_id: importId, source_row_id: 'manual_1', visit_id: '', doctor_id: normalizeDoctorId_(entry.doctor || ''), poli_id: normalizePoliId_(entry.poli || ''),
         transaction_date: date || period + '-01', revenue_type: entry.category || 'tindakan', item_code: '', item_name: entry.description || 'Pendapatan manual',
-        quantity: asNumber_(entry.quantity, 1), unit_price: asNumber_(entry.unitPrice, asNumber_(entry.amount, 0)), gross_amount: asNumber_(entry.grossAmount, asNumber_(entry.amount, 0)),
+        quantity: asNumber_(entry.quantity, 1), unit_price: asNumber_(entry.unitPrice, asNumber_(entry.amount, 0)), gross_amount: asNumber_(entry.grossAmount, asNumber_(entry.unitPrice, asNumber_(entry.amount, 0)) * asNumber_(entry.quantity, 1)),
         discount_amount: asNumber_(entry.discountAmount, 0), net_amount: asNumber_(entry.amount, 0), paid_amount: asNumber_(entry.paidAmount, asNumber_(entry.amount, 0)),
         receivable_amount: asNumber_(entry.receivableAmount, 0), payment_method: entry.paymentMethod || '', payer_type: entry.payerType || '', cashier: '', status: 'paid', trace_status: 'manual_trace', created_at: now,
       };
@@ -39,7 +39,7 @@ function saveManualClinicEntryForContext_(context, entry) {
       sheetName = 'BIAYA';
       row = {
         tenant_id: context.tenantId, clinic_id: context.clinicId, expense_id: 'exp_' + importId, import_id: importId, source_row_id: 'manual_1',
-        expense_date: date || period + '-01', expense_category: entry.category || 'operasional', expense_name: entry.description || 'Biaya manual', account_id: '',
+        expense_date: date || period + '-01', expense_category: entry.category || 'operasional', expense_name: entry.description || 'Biaya manual', account_id: entry.accountId || '',
         amount: asNumber_(entry.amount, 0), payment_method: entry.paymentMethod || '', vendor_name: entry.vendor || '', related_visit_id: '', related_item_code: '',
         cost_type: entry.costType || 'operational', allocation_target: 'clinic', allocation_id: context.clinicId, status: 'paid', trace_status: 'manual_trace', created_at: now,
       };
@@ -75,4 +75,54 @@ function saveManualClinicEntryForContext_(context, entry) {
 function saveDefaultManualClinicEntry(entry) {
   const context = resolveRequestContext_({}, {}, 'owner');
   return saveManualClinicEntryForContext_(context, entry || {});
+}
+
+function getDefaultManualInputOptions() {
+  const context = resolveRequestContext_({}, {}, 'owner');
+  ensurePhase1WarehouseSheetsNoLock_();
+  const active = row => String(row.status || 'active').toLowerCase() !== 'inactive';
+  const doctors = getRowsAsObjects_('MASTER_DOKTER')
+    .filter(row => inScope_(row, context.tenantId, context.clinicId) && active(row))
+    .map(row => ({ value: row.doctor_id || normalizeDoctorId_(row.doctor_name), label: row.doctor_name || row.doctor_id, meta: row.specialty || '' }));
+  const polis = getRowsAsObjects_('MASTER_POLI')
+    .filter(row => inScope_(row, context.tenantId, context.clinicId) && active(row))
+    .map(row => ({ value: row.poli_id || normalizePoliId_(row.poli_name), label: row.poli_name || row.poli_id }));
+  const medicines = getRowsAsObjects_('MASTER_OBAT')
+    .filter(row => inScope_(row, context.tenantId, context.clinicId) && active(row))
+    .slice(0, 300)
+    .map(row => ({ value: row.medicine_id || row.medicine_name, label: row.medicine_name || row.medicine_id, meta: row.unit || '' }));
+  const coa = getRowsAsObjects_('MASTER_COA')
+    .filter(row => row.tenant_id === context.tenantId && active(row))
+    .map(row => ({ value: row.account_id || row.account_code, label: [row.account_code, row.account_name].filter(Boolean).join(' - '), meta: row.account_type || '' }));
+  return {
+    ok: true,
+    doctors: doctors.length ? doctors : [{ value: 'doc_umum', label: 'Dokter Umum' }, { value: 'doc_gigi', label: 'Dokter Gigi' }],
+    polis: polis.length ? polis : [{ value: 'poli_umum', label: 'Poli Umum' }, { value: 'poli_gigi', label: 'Poli Gigi' }, { value: 'poli_kia', label: 'KIA' }],
+    medicines,
+    coa,
+    paymentMethods: [
+      { value: 'cash', label: 'Tunai' }, { value: 'transfer', label: 'Transfer Bank' }, { value: 'qris', label: 'QRIS' },
+      { value: 'debit', label: 'Kartu Debit' }, { value: 'credit_card', label: 'Kartu Kredit' }, { value: 'bpjs', label: 'BPJS' }, { value: 'insurance', label: 'Asuransi' }
+    ],
+    payerTypes: [
+      { value: 'umum', label: 'Pasien Umum' }, { value: 'bpjs', label: 'BPJS' }, { value: 'asuransi', label: 'Asuransi' }, { value: 'perusahaan', label: 'Perusahaan' }
+    ],
+    revenueCategories: [
+      { value: 'konsultasi', label: 'Konsultasi' }, { value: 'tindakan', label: 'Tindakan Medis' }, { value: 'obat', label: 'Obat / Farmasi' },
+      { value: 'laboratorium', label: 'Laboratorium' }, { value: 'administrasi', label: 'Administrasi' }, { value: 'lainnya', label: 'Lainnya' }
+    ],
+    expenseCategories: [
+      { value: 'gaji', label: 'Gaji & Honor' }, { value: 'sewa', label: 'Sewa' }, { value: 'obat_bmhp', label: 'Obat & BMHP' },
+      { value: 'utilitas', label: 'Listrik, Air, Internet' }, { value: 'marketing', label: 'Marketing' }, { value: 'maintenance', label: 'Maintenance' },
+      { value: 'administrasi', label: 'Administrasi' }, { value: 'operasional', label: 'Operasional Lainnya' }
+    ],
+    taxTypes: [
+      { value: 'PPh Final UMKM', label: 'PPh Final UMKM' }, { value: 'PPh 21', label: 'PPh 21' }, { value: 'PPh 23', label: 'PPh 23' },
+      { value: 'PPN Keluaran', label: 'PPN Keluaran' }, { value: 'PPN Masukan', label: 'PPN Masukan' }, { value: 'Pajak Daerah', label: 'Pajak Daerah' }, { value: 'Pajak manual', label: 'Pajak Lainnya' }
+    ],
+    visitCategories: [
+      { value: 'rawat_jalan', label: 'Rawat Jalan' }, { value: 'konsultasi', label: 'Konsultasi' }, { value: 'tindakan', label: 'Tindakan' },
+      { value: 'kontrol', label: 'Kontrol' }, { value: 'kia', label: 'KIA' }, { value: 'gigi', label: 'Gigi' }
+    ]
+  };
 }
