@@ -58,9 +58,9 @@ function saveManualClinicEntryForContext_(context, entry) {
       sheetName = 'KUNJUNGAN';
       row = {
         tenant_id: context.tenantId, clinic_id: context.clinicId, visit_id: 'visit_' + importId, source_visit_id: '', import_id: importId, source_row_id: 'manual_1',
-        visit_date: date || period + '-01', registration_time: '', patient_ref: entry.patientRef || '', patient_type: entry.patientType || 'umum', payer_type: entry.payerType || '',
+        visit_date: date || period + '-01', registration_time: entry.registrationTime || '', patient_ref: entry.patientRef || '', patient_type: entry.patientType || 'umum', payer_type: entry.payerType || '',
         doctor_id: normalizeDoctorId_(entry.doctor || ''), poli_id: normalizePoliId_(entry.poli || ''), service_category: entry.category || 'rawat_jalan', service_name: entry.description || 'Kunjungan manual',
-        status: 'completed', data_status: 'manual', created_at: now, updated_at: now,
+        status: entry.status || 'registered', data_status: 'manual', created_at: now, updated_at: now,
       };
     } else {
       throw new Error('Jenis input tidak dikenal: ' + type);
@@ -121,8 +121,8 @@ function getDefaultManualInputOptions() {
       { value: 'PPN Keluaran', label: 'PPN Keluaran' }, { value: 'PPN Masukan', label: 'PPN Masukan' }, { value: 'Pajak Daerah', label: 'Pajak Daerah' }, { value: 'Pajak manual', label: 'Pajak Lainnya' }
     ],
     visitCategories: [
-      { value: 'rawat_jalan', label: 'Rawat Jalan' }, { value: 'konsultasi', label: 'Konsultasi' }, { value: 'tindakan', label: 'Tindakan' },
-      { value: 'kontrol', label: 'Kontrol' }, { value: 'kia', label: 'KIA' }, { value: 'gigi', label: 'Gigi' }
+      { value: 'rawat_jalan', label: 'Rawat Jalan / Registrasi' }, { value: 'kontrol', label: 'Kontrol' }, { value: 'screening', label: 'Screening / Pemeriksaan Awal' },
+      { value: 'kia', label: 'KIA' }, { value: 'gigi', label: 'Gigi' }, { value: 'administrasi', label: 'Administrasi' }
     ]
   };
 }
