@@ -9,18 +9,94 @@ function getDashboardPayload(tenantId, clinicId, period) {
   const revenueBreakdown = buildRevenueBreakdown_(tenantId, clinicId, period);
   const costBreakdown = buildCostBreakdown_(tenantId, clinicId, period);
   const dataQualityWarnings = getDashboardDataQualityWarnings_(tenantId, clinicId, period);
+  const normalizedSummary = normalizeSummaryForClient_(summary);
+  const normalizedAlerts = alerts.map(normalizeAlertForClient_);
+  const analysis = buildDashboardAiAnalysis_(normalizedSummary, revenueBreakdown, costBreakdown, dataQualityWarnings, normalizedAlerts);
   return {
     appName: APP_CONFIG.appName,
     tenantId,
     clinicId,
     period,
-    summary: normalizeSummaryForClient_(summary),
+    summary: normalizedSummary,
     revenueBreakdown,
     costBreakdown,
-    alerts: alerts.map(normalizeAlertForClient_),
+    alerts: normalizedAlerts,
+    aiAnalysis: analysis,
     dataQualityWarnings: dataQualityWarnings.map(normalizeValidationIssueForClient_),
     trend: daily.map(normalizeDailyTrendForClient_),
     generatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
+  };
+}
+
+function buildDashboardAiAnalysis_(summary, revenueBreakdown, costBreakdown, dataQualityWarnings, alerts) {
+  const insights = [];
+  const actions = [];
+  const generatedAlerts = [];
+  const margin = summary && summary.profitMargin !== null && summary.profitMargin !== undefined ? Number(summary.profitMargin) : null;
+  const revenue = summary ? Number(summary.totalRevenue || 0) : 0;
+  const cost = summary ? Number(summary.totalCost || 0) : 0;
+  const profit = summary ? Number(summary.netProfit || 0) : 0;
+  const revenueGrowth = summary && summary.revenueGrowth !== null && summary.revenueGrowth !== undefined ? Number(summary.revenueGrowth) : null;
+  const profitGrowth = summary && summary.profitGrowth !== null && summary.profitGrowth !== undefined ? Number(summary.profitGrowth) : null;
+  const topRevenue = (revenueBreakdown || [])[0];
+  const topCost = (costBreakdown || [])[0];
+
+  if (!revenue) {
+    insights.push('Belum ada pendapatan untuk periode ini, jadi dashboard belum bisa memberi analisa bisnis yang solid.');
+    actions.push('Upload data PENDAPATAN dan BIAYA, atau input manual minimal transaksi harian utama.');
+    generatedAlerts.push({ type: 'missing_revenue', severity: 'medium', title: 'Data pendapatan belum tersedia', message: 'Dashboard belum menerima data pendapatan periode ini. KPI profit dan margin belum representatif.', kpiRef: 'revenue' });
+  } else {
+    insights.push('Revenue periode ini sudah terbaca. Fokus berikutnya adalah menjaga margin dan komposisi biaya agar profit tidak tergerus.');
+  }
+
+  if (margin !== null) {
+    if (margin < 0) {
+      insights.push('Margin profit negatif: biaya lebih besar daripada pendapatan pada periode ini.');
+      actions.push('Cek biaya terbesar, diskon, piutang belum tertagih, dan transaksi pendapatan yang mungkin belum masuk.');
+      generatedAlerts.push({ type: 'negative_margin', severity: 'critical', title: 'Margin profit negatif', message: 'Biaya periode ini lebih besar dari pendapatan. Perlu cek biaya utama dan kelengkapan pendapatan.', kpiRef: 'profit_margin' });
+    } else if (margin < 0.15) {
+      insights.push('Margin profit masih tipis. Klinik menghasilkan laba, tetapi ruang aman operasional belum besar.');
+      actions.push('Review harga layanan, HPP obat/BMHP, dan beban operasional berulang.');
+      generatedAlerts.push({ type: 'thin_margin', severity: 'high', title: 'Margin profit tipis', message: 'Net margin di bawah 15%. Owner sebaiknya review komponen biaya dan pricing layanan.', kpiRef: 'profit_margin' });
+    } else if (margin >= 0.3) {
+      insights.push('Margin profit terlihat sehat untuk pembacaan manajemen awal. Tetap validasi dengan data biaya lengkap.');
+      actions.push('Pertahankan layanan dengan kontribusi revenue tinggi dan pastikan biaya tetap tercatat lengkap.');
+    }
+  }
+
+  if (revenueGrowth !== null && revenueGrowth < -0.1) {
+    insights.push('Revenue turun lebih dari 10% dibanding periode sebelumnya.');
+    actions.push('Bandingkan jumlah kunjungan, layanan terlaris, dan kanal pembayaran/penjamin yang menurun.');
+    generatedAlerts.push({ type: 'revenue_drop', severity: 'high', title: 'Revenue menurun', message: 'Revenue turun lebih dari 10% dibanding periode sebelumnya.', kpiRef: 'revenue_growth' });
+  }
+  if (profitGrowth !== null && profitGrowth < -0.1) {
+    insights.push('Profit turun lebih dari 10%. Jika revenue stabil, kemungkinan tekanan datang dari biaya atau diskon.');
+    actions.push('Cek komposisi biaya terbesar dan bandingkan dengan bulan sebelumnya.');
+  }
+  if (topRevenue && topRevenue.category) insights.push('Kontributor pendapatan terbesar saat ini: ' + topRevenue.category + '.');
+  if (topCost && topCost.category) {
+    insights.push('Pos biaya terbesar saat ini: ' + topCost.category + '.');
+    if (revenue && Number(topCost.amount || 0) / revenue > 0.35) {
+      actions.push('Pos biaya ' + topCost.category + ' cukup dominan terhadap omzet; cek apakah wajar secara operasional.');
+      generatedAlerts.push({ type: 'dominant_cost', severity: 'medium', title: 'Biaya dominan perlu dicek', message: 'Pos biaya ' + topCost.category + ' mengambil porsi besar dari omzet periode ini.', kpiRef: 'cost_breakdown' });
+    }
+  }
+  if ((dataQualityWarnings || []).length) {
+    insights.push('Ada ' + dataQualityWarnings.length + ' isu kualitas data yang bisa memengaruhi akurasi KPI.');
+    actions.push('Buka Data Quality dan koreksi baris yang warning sebelum mengambil keputusan final.');
+    generatedAlerts.push({ type: 'data_quality', severity: 'medium', title: 'Data perlu dibersihkan', message: 'Ada warning kualitas data yang dapat memengaruhi KPI dan laporan.', kpiRef: 'data_quality' });
+  }
+
+  if (!actions.length) actions.push('Pantau trend harian dan lanjutkan input/upload data secara rutin agar analisa makin akurat.');
+  const allAlerts = (alerts || []).concat(generatedAlerts).slice(0, 6);
+  return {
+    basis: 'rule_based_management_analysis',
+    confidence: revenue && (!dataQualityWarnings || !dataQualityWarnings.length) ? 'medium' : 'low',
+    summary: insights.slice(0, 4).join(' '),
+    insights: insights.slice(0, 6),
+    recommendedActions: actions.slice(0, 5),
+    generatedAlerts: allAlerts,
+    disclaimer: 'Analisa ini berbasis rule KPI dan data yang tersedia. Untuk keputusan pajak/akuntansi final tetap perlu validasi profesional.'
   };
 }
 
