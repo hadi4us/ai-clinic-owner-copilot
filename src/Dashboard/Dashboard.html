@@ -4,58 +4,334 @@
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI Clinic Owner Copilot POC</title>
+  <title>Klinik Copilot</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
-    :root{--bg:#f6f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--green:#059669;--red:#dc2626;--amber:#d97706;--blue:#2563eb;--line:#e5e7eb}*{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}.wrap{max-width:880px;margin:0 auto;padding:16px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}h1{font-size:21px;line-height:1.2;margin:0 0 4px}.sub,.muted{color:var(--muted);font-size:13px}.card{background:var(--card);border-radius:18px;padding:16px;box-shadow:0 8px 24px rgba(15,23,42,.06);margin-bottom:12px}.hero{background:linear-gradient(135deg,#111827,#1d4ed8);color:white}.label{font-size:13px;color:rgba(255,255,255,.75);margin-bottom:8px}.hero .value{font-size:36px;font-weight:850;letter-spacing:-.04em}.hero .note{margin-top:8px;font-size:13px;color:rgba(255,255,255,.82)}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric .name{color:var(--muted);font-size:12px;margin-bottom:8px}.metric .num{font-size:20px;font-weight:850;letter-spacing:-.02em}.metric .hint{margin-top:4px;font-size:12px;color:var(--muted)}.section-title{font-size:15px;font-weight:850;margin:0 0 12px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #eef2f7}.row:first-child{border-top:0;padding-top:0}.row .cat{font-size:13px;color:#374151;text-transform:capitalize}.row .amt{font-size:13px;font-weight:850}.alert{border-left:4px solid var(--amber);background:#fffbeb;box-shadow:none;margin:0 0 10px;padding:12px}.alert.high,.alert.critical{border-left-color:var(--red);background:#fef2f2}.empty{color:var(--muted);font-size:13px}button{border:0;background:#2563eb;color:white;border-radius:12px;padding:10px 12px;font-weight:850;cursor:pointer}button.secondary{background:#111827}button:disabled{opacity:.55;cursor:not-allowed}input,select{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:white}.upload-grid{display:grid;grid-template-columns:1fr 160px 160px;gap:10px;align-items:end}.status{font-size:13px;margin-top:8px}.ok{color:var(--green)}.bad{color:var(--red)}@media(max-width:720px){.grid{grid-template-columns:1fr 1fr}.upload-grid{grid-template-columns:1fr}.wrap{padding:12px}.hero .value{font-size:30px}.card{border-radius:16px;padding:14px}}
+    :root{
+      --bg:#f5f7fb;--surface:#ffffff;--surface-2:#f8fafc;--surface-3:#eef6f4;--text:#102033;--muted:#607086;--soft:#8a9aad;
+      --line:#dde6ef;--line-strong:#c4d2df;--primary:#0f766e;--primary-2:#0b5f59;--primary-soft:#d9f7f1;
+      --blue:#2563eb;--green:#047857;--red:#be123c;--amber:#b45309;--purple:#6d28d9;
+      --shadow-sm:0 1px 2px rgba(15,23,42,.05);--shadow:0 14px 38px rgba(24,39,75,.08);--shadow-lg:0 24px 70px rgba(15,23,42,.12);
+      --nav:#0b1827;--nav-2:#0d2334;--navText:#b7c5d4;--navActive:#e6fbf6;
+    }
+    *{box-sizing:border-box}html{background:var(--bg);scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:linear-gradient(180deg,#f8fbff 0,#f4f7fb 42%,#eef3f8 100%);color:var(--text);font-size:14px;line-height:1.45}.app{min-height:100vh;display:grid;grid-template-columns:272px minmax(0,1fr)}
+    .sidebar{background:linear-gradient(180deg,var(--nav),var(--nav-2));color:white;padding:20px 14px;position:sticky;top:0;height:100vh;border-right:1px solid rgba(255,255,255,.08)}
+    .brand{display:flex;gap:12px;align-items:center;margin:4px 8px 22px}.brand-mark{width:40px;height:40px;border-radius:12px;background:#e6fbf6;color:#0f766e;display:grid;place-items:center;font-weight:950;box-shadow:inset 0 0 0 1px rgba(15,118,110,.12)}.brand-title{font-size:15px;font-weight:900;line-height:1.12;letter-spacing:-.01em}.brand-title span{display:block;color:var(--navText);font-size:11px;font-weight:700;margin-top:5px;letter-spacing:.07em;text-transform:uppercase}
+    .nav{display:grid;gap:5px}.nav button{width:100%;text-align:left;border:0;background:transparent;color:var(--navText);border-radius:13px;padding:11px 12px;font-weight:780;cursor:pointer;display:flex;align-items:center;gap:10px;letter-spacing:.005em}.nav button::before{content:"";width:7px;height:7px;border-radius:999px;background:#3d536b;flex:0 0 auto}.nav button:hover{background:rgba(255,255,255,.065);color:#fff}.nav button.active{background:var(--navActive);color:#0d6b63;box-shadow:0 10px 24px rgba(0,0,0,.2)}.nav button.active::before{background:#0f766e}.nav button.subnav{margin-left:18px;width:calc(100% - 18px);padding:8px 12px 8px 15px;font-size:12px;font-weight:740;border-left:1px solid rgba(255,255,255,.1);border-radius:11px}.nav button.subnav::before{width:5px;height:5px}.nav button.locked{opacity:.38;cursor:not-allowed}.nav button.locked:hover{background:transparent;color:var(--navText)}.nav-note,.user-card{color:#91a4b8;font-size:12px;line-height:1.55;margin:20px 8px 0;padding:13px;border:1px solid rgba(255,255,255,.08);border-radius:15px;background:rgba(255,255,255,.04)}.user-card{margin-top:14px}.user-card b{display:block;color:#fff;font-size:13px;margin-bottom:3px}.role-pill{display:inline-flex;margin-top:8px;border-radius:999px;background:rgba(45,212,191,.12);color:#99f6e4;border:1px solid rgba(153,246,228,.2);padding:4px 8px;font-weight:850}
+    .main{padding:30px}.wrap{max-width:1220px;margin:0 auto}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px}.top-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.eyebrow{font-size:12px;color:var(--primary);font-weight:900;text-transform:uppercase;letter-spacing:.09em;margin-bottom:7px}h1{font-size:32px;line-height:1.04;margin:0 0 8px;letter-spacing:-.04em}.sub,.muted{color:var(--muted);font-size:13px;line-height:1.55}.view{display:none}.view.active{display:block;animation:fadeIn .16s ease-out}@keyframes fadeIn{from{opacity:.55;transform:translateY(4px)}to{opacity:1;transform:none}}
+    .card{background:rgba(255,255,255,.94);border:1px solid rgba(221,230,239,.95);border-radius:20px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;backdrop-filter:blur(8px)}.card.compact{padding:14px}.hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#0b1827,#0f3f3c 56%,#0f766e);color:white;padding:26px;border:0;box-shadow:var(--shadow-lg)}.hero:after{content:"";position:absolute;right:-82px;top:-88px;width:260px;height:260px;border-radius:999px;background:radial-gradient(circle,rgba(153,246,228,.25),rgba(153,246,228,0) 68%)}.label{font-size:12px;color:rgba(255,255,255,.72);font-weight:850;text-transform:uppercase;letter-spacing:.09em;margin-bottom:10px}.hero .value{font-size:48px;font-weight:950;letter-spacing:-.06em;position:relative}.hero .note{margin-top:12px;font-size:13px;color:rgba(255,255,255,.84);position:relative;max-width:780px}.hero-meta{position:relative;display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.hero-chip{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.09);color:#e9fffb;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:800}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.two-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.metric{min-height:128px;position:relative;overflow:hidden}.metric:after{content:"";position:absolute;right:-30px;top:-30px;width:90px;height:90px;border-radius:999px;background:#f1f5f9}.metric .name{color:var(--muted);font-size:12px;font-weight:850;text-transform:uppercase;letter-spacing:.075em;margin-bottom:12px;position:relative}.metric .num{font-size:25px;font-weight:950;letter-spacing:-.04em;position:relative}.metric .hint{margin-top:8px;font-size:12px;color:var(--muted);position:relative}.metric.good{border-top:4px solid var(--green)}.metric.warn{border-top:4px solid var(--amber)}.metric.info{border-top:4px solid var(--blue)}.metric.danger{border-top:4px solid var(--red)}.metric.good:after{background:#dcfce7}.metric.warn:after{background:#fef3c7}.metric.info:after{background:#dbeafe}.metric.danger:after{background:#ffe4e6}.section-title{font-size:16px;font-weight:950;margin:0 0 14px;letter-spacing:-.02em}.section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}.section-head .section-title{margin-bottom:3px}
+    .row{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:12px 0;border-top:1px solid #edf2f7}.row:first-child{border-top:0;padding-top:0}.row .cat{font-size:13px;color:#223249;text-transform:capitalize;font-weight:820}.row .amt{font-size:13px;font-weight:950;white-space:nowrap}.progress-track{height:7px;background:#edf2f7;border-radius:999px;overflow:hidden;margin-top:8px}.progress-bar{height:100%;border-radius:999px;background:linear-gradient(90deg,#0f766e,#2dd4bf)}.data-table{width:100%;border-collapse:separate;border-spacing:0}.data-table th{font-size:11px;text-transform:uppercase;letter-spacing:.065em;color:#64748b;text-align:left;background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:10px}.data-table td{border-bottom:1px solid #eef2f7;padding:12px 10px;vertical-align:top}.data-table tr:hover td{background:#fbfdff}.type-chip{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:850;background:#eef2ff;color:#3730a3;text-transform:capitalize}.amount-pos{color:#047857;font-weight:900}.amount-neg{color:#b91c1c;font-weight:900}
+    .alert{border-left:4px solid var(--amber);background:#fffbeb;box-shadow:none;margin:0 0 10px;padding:14px;border-radius:15px}.alert.high,.alert.critical{border-left-color:var(--red);background:#fff1f2}.alert.medium{border-left-color:var(--amber);background:#fffbeb}.alert.low{border-left-color:var(--blue);background:#eff6ff}.insight-list{display:grid;gap:10px;margin:0;padding:0;list-style:none}.insight-list li{position:relative;padding:12px 12px 12px 34px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;color:#334155;line-height:1.45}.insight-list li:before{content:"";position:absolute;left:13px;top:17px;width:8px;height:8px;border-radius:999px;background:#0f766e}.ai-badge{font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#0f766e;background:#d9f7f1;border:1px solid #99f6e4;border-radius:999px;padding:6px 9px;white-space:nowrap}.auth-banner{display:none;margin-bottom:14px;border:1px solid #fecaca;background:#fff1f2;color:#991b1b;border-radius:18px;padding:16px;box-shadow:var(--shadow)}.hidden-by-role{display:none!important}.empty{color:var(--muted);font-size:13px;line-height:1.5}
+    .btn,button.primary,button.secondary{border:0;border-radius:12px;padding:10px 14px;font-weight:850;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:.15s ease;min-height:40px}.btn,button.primary{background:var(--primary);color:white;box-shadow:0 10px 22px rgba(15,118,110,.2)}button.primary:hover{background:var(--primary-2);transform:translateY(-1px)}.btn.secondary,button.secondary{background:#102033;color:white;box-shadow:0 10px 22px rgba(15,23,42,.12)}button.secondary:hover{background:#182b41;transform:translateY(-1px)}.btn.ghost{background:#ecfeff;color:#0f766e;box-shadow:none}.btn:disabled,button:disabled{opacity:.55;cursor:not-allowed;transform:none}label{display:block;margin-bottom:6px;font-weight:780}input,select{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:white;color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s}input:focus,select:focus{border-color:#5eead4;box-shadow:0 0 0 4px rgba(45,212,191,.14)}.upload-grid{display:grid;grid-template-columns:1fr 180px 180px;gap:12px;align-items:end}.status{font-size:13px;margin-top:10px}.ok{color:var(--green);font-weight:780}.bad{color:var(--red);font-weight:780}.template-list{display:grid;gap:8px;margin:12px 0 0;padding-left:18px}.template-box{border:1px solid #99f6e4;background:linear-gradient(180deg,#ecfeff,#f0fdfa);border-radius:17px;padding:16px;margin-top:14px}.pill{display:inline-block;border-radius:999px;background:white;color:#0f766e;border:1px solid #99f6e4;padding:5px 10px;font-size:12px;font-weight:850;margin:3px 5px 3px 0}.toolbar-note{font-size:12px;color:var(--soft)}canvas{max-width:100%}
+    @media(max-width:1040px){.app{grid-template-columns:1fr}.sidebar{height:auto;position:relative}.brand{margin-bottom:16px}.nav{grid-template-columns:repeat(3,1fr)}.main{padding:20px}.grid,.two-grid{grid-template-columns:1fr 1fr}.upload-grid{grid-template-columns:1fr}.hero .value{font-size:38px}.card{border-radius:18px;padding:15px}.nav-note{display:none}}
+    @media(max-width:660px){.grid,.two-grid,.nav{grid-template-columns:1fr}.top{display:block}.top-actions{margin-top:12px}h1{font-size:25px}.hero .value{font-size:31px}.main{padding:12px}.sidebar{padding:14px}.app{display:block}}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="top"><div><h1>POC Dashboard Revenue & Profit</h1><div class="sub" id="subtitle">Loading data...</div></div><button id="refreshBtn" onclick="loadDashboard()">Refresh</button></div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">KC</div><div class="brand-title">Klinik Copilot<span>Finance Command Center</span></div></div>
+      <nav class="nav" aria-label="Menu utama">
+        <button id="nav-dashboard" class="active" data-permission="viewDashboard" onclick="showView('dashboard')">Dashboard</button>
+        <button id="nav-upload" data-permission="uploadData" onclick="showView('upload')">Upload Data</button>
+        <button id="nav-manual" data-permission="manualInput" onclick="showView('manual')">Input Transaksi</button>
+        <button id="nav-transactions" class="subnav" data-permission="manualInput" onclick="showView('transactions')">Detail List Transaksi</button>
+        <button id="nav-reports" data-permission="viewReports" onclick="showView('reports')">Laporan Keuangan</button>
+        <button id="nav-reports-profit" class="subnav" data-permission="viewReports" onclick="showView('reports-profit')">Laba Rugi</button>
+        <button id="nav-reports-cash" class="subnav" data-permission="viewReports" onclick="showView('reports-cash')">Arus Kas</button>
+        <button id="nav-reports-lra" class="subnav" data-permission="viewReports" onclick="showView('reports-lra')">LRA</button>
+        <button id="nav-reports-balance" class="subnav" data-permission="viewReports" onclick="showView('reports-balance')">Neraca</button>
+        <button id="nav-reports-tax" class="subnav" data-permission="viewReports" onclick="showView('reports-tax')">Pajak</button>
+        <button id="nav-reports-receivable" class="subnav" data-permission="viewReports" onclick="showView('reports-receivable')">Piutang & Utang</button>
+        <button id="nav-reports-coa" class="subnav" data-permission="viewReports" onclick="showView('reports-coa')">COA & Rasio</button>
+      </nav>
+      <div class="user-card"><b id="authUser">Memeriksa akses...</b><span id="authEmail">-</span><br><span class="role-pill" id="authRole">Loading</span></div>
+      <div class="nav-note">Fokus ke angka yang perlu tindakan: omzet, profit, cash, pajak, dan kualitas data.</div>
+    </aside>
 
-    <section class="card">
-      <h2 class="section-title">Upload Excel / CSV</h2>
-      <div class="upload-grid">
-        <div><div class="muted">File SIM export. Sheet bernama PENDAPATAN/BIAYA lebih akurat; CSV auto-detect sederhana.</div><input id="fileInput" type="file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
-        <div><label class="muted">Periode KPI</label><input id="periodInput" placeholder="YYYY-MM"></div>
-        <div><button id="uploadBtn" onclick="uploadFile()">Upload & Hitung</button></div>
+    <main class="main">
+      <div class="wrap">
+        <div class="auth-banner" id="authBanner"><b>Akses belum valid</b><div id="authMessage">Memeriksa kredensial Google...</div></div>
+        <section id="view-dashboard" class="view active">
+          <div class="top"><div><div class="eyebrow">Owner Dashboard</div><h1>Ringkasan Keuangan Klinik</h1><div class="sub" id="subtitle">Memuat data periode berjalan...</div></div><div class="top-actions"><button id="refreshBtn" class="primary" onclick="loadDashboard()">Perbarui</button><button class="secondary" onclick="showView('upload')">Upload Data</button></div></div>
+          <section class="card hero"><div class="label" id="profitLabel">Laba Bersih</div><div class="value" id="netProfit">-</div><div class="note" id="profitNote">-</div><div class="hero-meta"><span class="hero-chip" id="heroRevenue">Omzet -</span><span class="hero-chip" id="heroCost">Biaya -</span><span class="hero-chip" id="heroMargin">Margin -</span></div></section>
+          <section class="grid">
+            <div class="card metric good"><div class="name">Omzet</div><div class="num" id="revenue">-</div><div class="hint" id="revenueGrowth">Perubahan -</div></div>
+            <div class="card metric good"><div class="name">Laba</div><div class="num" id="profitMini">-</div><div class="hint" id="profitGrowth">Perubahan -</div></div>
+            <div class="card metric warn"><div class="name">Biaya</div><div class="num" id="costs">-</div><div class="hint">Operasional + langsung</div></div>
+            <div class="card metric info"><div class="name">Margin</div><div class="num" id="margin">-</div><div class="hint">Laba / omzet</div></div>
+          </section>
+          <section class="two-grid">
+            <div class="card"><div class="section-head"><div><h2 class="section-title">Alert Prioritas</h2><div class="muted">Sinyal yang perlu dilihat owner hari ini.</div></div><span class="ai-badge">Live KPI</span></div><div id="dashboardAlerts"></div></div>
+            <div class="card"><div class="section-head"><div><h2 class="section-title">Insight Manajemen</h2><div class="muted">Catatan singkat dari KPI dan data yang tersedia.</div></div><span class="ai-badge">KPI</span></div><div id="aiAnalysis"></div></div>
+          </section>
+          <section class="two-grid">
+            <div class="card"><div class="section-head"><div><h2 class="section-title">Kualitas Data</h2><div class="muted">Masalah data yang bisa mengganggu akurasi laporan.</div></div><span class="ai-badge">Kontrol</span></div><div id="dataQuality"></div></div>
+            <div class="card"><div class="section-head"><div><h2 class="section-title">Alert Aktif</h2><div class="muted">Hal operasional yang masih perlu ditutup.</div></div><span class="ai-badge">Prioritas</span></div><div id="alerts"></div></div>
+          </section>
+          <section class="two-grid">
+            <div class="card"><h2 class="section-title">Sumber Omzet</h2><div id="revenueBreakdown"></div></div>
+            <div class="card"><h2 class="section-title">Struktur Biaya</h2><div id="costBreakdown"></div></div>
+          </section>
+          <section class="card"><h2 class="section-title">Tren Omzet, Biaya, dan Laba Harian</h2><canvas id="financeChart" height="170"></canvas><div class="empty" id="chartEmpty" style="display:none">Trend harian belum tersedia.</div></section>
+        </section>
+
+        <section id="view-upload" class="view">
+          <div class="top"><div><div class="eyebrow">Data Intake</div><h1>Upload Data Klinik</h1><div class="sub">Masukkan data dari SIM klinik atau template Excel agar dashboard dan laporan terhitung otomatis.</div></div><div class="top-actions"><button class="secondary" onclick="showView('dashboard')">Lihat Dashboard</button></div></div>
+          <section class="card">
+            <h2 class="section-title">Template Excel Data Klinik</h2>
+            <div class="muted">Download template ini, isi sheet yang relevan, lalu upload kembali. Minimal untuk dashboard profit: <b>PENDAPATAN</b> dan <b>BIAYA</b>.</div>
+            <div class="template-box">
+              <button class="primary" onclick="downloadClinicTemplate()">Download Template Excel</button>
+              <div style="margin-top:10px"><span class="pill">PENDAPATAN</span><span class="pill">BIAYA</span><span class="pill">KUNJUNGAN</span><span class="pill">TINDAKAN</span><span class="pill">RESEP</span></div>
+              <ul class="template-list muted">
+                <li>Jangan isi nama pasien, NIK, nomor HP, alamat, diagnosis, atau rekam medis.</li>
+                <li>Kolom tanggal pakai format YYYY-MM-DD.</li>
+                <li>Nominal tanpa titik/koma ribuan agar import lebih aman.</li>
+              </ul>
+            </div>
+          </section>
+          <section class="card">
+            <h2 class="section-title">Upload Excel / CSV</h2>
+            <div class="upload-grid">
+              <div><div class="muted">File SIM export. Sheet bernama PENDAPATAN/BIAYA lebih akurat; CSV auto-detect sederhana.</div><input id="fileInput" type="file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+              <div><label class="muted">Periode KPI</label><input id="periodInput" placeholder="YYYY-MM"></div>
+              <div><button id="uploadBtn" class="primary" onclick="uploadFile()">Upload & Hitung</button></div>
+            </div>
+            <div class="status" id="uploadStatus">Siap menerima file. Data sensitif pasien tidak diperlukan.</div>
+          </section>
+        </section>
+
+        <section id="view-manual" class="view">
+          <div class="top"><div><div class="eyebrow">Input Transaksi</div><h1>Input Transaksi Baru</h1><div class="sub">Untuk klinik yang belum punya export data. Input cepat per transaksi, lalu sistem menghitung KPI ulang.</div></div><div class="top-actions"><button class="secondary" onclick="showView('transactions')">Detail List Transaksi</button><button class="secondary" onclick="showView('dashboard')">Lihat Dashboard</button></div></div>
+          <section class="card">
+            <h2 class="section-title">Form Input Transaksi</h2>
+            <div class="two-grid">
+              <div><label class="muted">Jenis Data</label><select id="manualType" onchange="updateManualHelp()"><option value="pendapatan">Pendapatan</option><option value="biaya">Biaya</option><option value="pajak">Pajak</option><option value="kunjungan">Kunjungan</option></select></div>
+              <div><label class="muted">Periode KPI</label><input id="manualPeriodHint" type="month" onchange="syncPeriodInput(this.value)"></div>
+            </div>
+
+            <div id="manual-pendapatan" class="manual-section">
+              <div class="two-grid" style="margin-top:12px"><div><label class="muted">Tanggal Transaksi</label><input id="revDate" type="date" required></div><div><label class="muted">Jenis Pendapatan</label><select id="revCategory"></select></div></div>
+              <div style="margin-top:10px"><label class="muted">Nama Layanan / Item</label><input id="revDescription" placeholder="Konsultasi dokter, tindakan, obat, administrasi..."></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Jumlah</label><input id="revQuantity" type="number" min="1" step="1" value="1"></div><div><label class="muted">Harga Satuan</label><input id="revUnitPrice" type="number" min="0" step="1000" placeholder="150000"></div></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Pendapatan Bersih</label><input id="revAmount" type="number" min="0" step="1000" placeholder="150000"></div><div><label class="muted">Diskon</label><input id="revDiscount" type="number" min="0" step="1000" value="0"></div></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Terbayar</label><input id="revPaid" type="number" min="0" step="1000" placeholder="150000"></div><div><label class="muted">Piutang</label><input id="revReceivable" type="number" min="0" step="1000" value="0"></div></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Metode Bayar</label><select id="revPayment"></select></div><div><label class="muted">Jenis Pasien / Penjamin</label><select id="revPayer"></select></div></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Dokter</label><select id="revDoctor"></select></div><div><label class="muted">Poli</label><select id="revPoli"></select></div></div>
+            </div>
+
+            <div id="manual-biaya" class="manual-section" style="display:none">
+              <div class="two-grid" style="margin-top:12px"><div><label class="muted">Tanggal Biaya</label><input id="expDate" type="date" required></div><div><label class="muted">Kategori Biaya</label><select id="expCategory"></select></div></div>
+              <div style="margin-top:10px"><label class="muted">Nama Biaya / Keterangan</label><input id="expDescription" placeholder="Gaji staff, sewa, listrik, pembelian obat..."></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Nominal Biaya</label><input id="expAmount" type="number" min="0" step="1000" placeholder="500000"></div><div><label class="muted">Metode Bayar</label><select id="expPayment"></select></div></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Vendor / Supplier</label><input id="expVendor" placeholder="Nama supplier/vendor, opsional"></div><div><label class="muted">Jenis Biaya</label><select id="expCostType"><option value="operational">Operasional</option><option value="cogs">HPP / Modal langsung</option><option value="salary">Gaji/Honor</option><option value="rent">Sewa</option><option value="utility">Utilitas</option></select></div></div>
+              <div style="margin-top:10px"><label class="muted">Akun COA</label><select id="expAccount"></select></div>
+            </div>
+
+            <div id="manual-pajak" class="manual-section" style="display:none">
+              <div class="two-grid" style="margin-top:12px"><div><label class="muted">Masa Pajak</label><input id="taxPeriod" type="month" required></div><div><label class="muted">Jenis Pajak</label><select id="taxType"></select></div></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Omzet Kena Pajak</label><input id="taxableRevenue" type="number" min="0" step="1000" placeholder="10000000"></div><div><label class="muted">DPP / Dasar Pengenaan Pajak</label><input id="taxBaseAmount" type="number" min="0" step="1000" placeholder="10000000"></div></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Tarif Pajak</label><input id="taxRate" type="number" min="0" step="0.001" placeholder="0.005 untuk 0,5%"></div><div><label class="muted">Pajak Terutang</label><input id="taxPayable" type="number" min="0" step="1000" placeholder="50000"></div></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Pajak Dibayar</label><input id="taxPaid" type="number" min="0" step="1000" value="0"></div><div><label class="muted">Status Dokumen</label><select id="taxDocStatus"><option value="manual">Manual</option><option value="draft">Draft</option><option value="paid">Sudah Dibayar</option><option value="reported">Sudah Dilapor</option></select></div></div>
+              <div style="margin-top:10px"><label class="muted">Catatan Pajak</label><input id="taxNotes" placeholder="Nomor billing/NTPN/catatan rekonsiliasi, opsional"></div>
+            </div>
+
+            <div id="manual-kunjungan" class="manual-section" style="display:none">
+              <div class="two-grid" style="margin-top:12px"><div><label class="muted">Tanggal Kunjungan</label><input id="visitDate" type="date" required></div><div><label class="muted">Jam Registrasi</label><input id="visitTime" type="time"></div></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Tipe Kunjungan</label><select id="visitCategory"></select></div><div><label class="muted">Status Kunjungan</label><select id="visitStatus"><option value="registered">Terdaftar</option><option value="waiting">Menunggu</option><option value="in_service">Sedang Dilayani</option><option value="completed">Selesai</option><option value="cancelled">Batal</option></select></div></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Kode Pasien Anonim</label><input id="visitPatientRef" placeholder="anon_001, opsional — jangan isi nama/NIK/no HP"></div><div><label class="muted">Status Pasien</label><select id="visitPatientType"><option value="baru">Pasien Baru</option><option value="lama">Pasien Lama</option><option value="kontrol">Kontrol</option></select></div></div>
+              <div style="margin-top:10px"><label class="muted">Jenis Pasien / Penjamin</label><select id="visitPayer"></select></div>
+              <div class="two-grid" style="margin-top:10px"><div><label class="muted">Dokter</label><select id="visitDoctor"></select></div><div><label class="muted">Poli</label><select id="visitPoli"></select></div></div>
+              <div style="margin-top:10px"><label class="muted">Tujuan Kunjungan / Layanan Administratif</label><input id="visitServiceName" placeholder="Registrasi rawat jalan, kontrol rutin, screening, administrasi... bukan diagnosa"></div>
+            </div>
+
+            <div class="template-box"><div class="muted" id="manualHelp">Pendapatan: gunakan tanggal transaksi, dropdown kategori/metode bayar/dokter/poli, dan nominal angka saja.</div></div>
+            <button id="manualBtn" class="primary" onclick="saveManualEntry()">Simpan & Hitung KPI</button>
+            <div class="status" id="manualStatus">Belum ada input manual.</div>
+          </section>
+        </section>
+
+        <section id="view-transactions" class="view">
+          <div class="top"><div><div class="eyebrow">Input Transaksi</div><h1>Detail List Transaksi</h1><div class="sub">Daftar transaksi yang sudah masuk dari input manual maupun upload, dipisahkan per jenis data dan periode.</div></div><div class="top-actions"><button class="secondary" onclick="showView('manual')">Input Baru</button><button class="primary" onclick="loadTransactions()">Refresh List</button></div></div>
+          <section class="card">
+            <div class="upload-grid">
+              <div><label class="muted">Jenis Transaksi</label><select id="transactionType"><option value="all">Semua transaksi</option><option value="pendapatan">Pendapatan</option><option value="biaya">Biaya</option><option value="pajak">Pajak</option><option value="kunjungan">Kunjungan</option></select></div>
+              <div><label class="muted">Periode</label><input id="transactionPeriod" type="month"></div>
+              <div><button class="primary" onclick="loadTransactions()">Tampilkan</button></div>
+            </div>
+            <div class="status" id="transactionStatus">Pilih periode lalu tampilkan transaksi.</div>
+          </section>
+          <section class="card">
+            <div class="section-head"><div><h2 class="section-title">Transaksi Terbaru</h2><div class="muted" id="transactionSummary">Belum dimuat.</div></div><span class="ai-badge">Warehouse</span></div>
+            <div style="overflow:auto"><table class="data-table"><thead><tr><th>Tanggal</th><th>Jenis</th><th>Kategori</th><th>Deskripsi</th><th>Nominal</th><th>Dokter/Poli</th><th>Status</th></tr></thead><tbody id="transactionRows"></tbody></table></div>
+          </section>
+        </section>
+
+        <section id="view-reports" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Laporan Keuangan</h1><div class="sub">Pusat laporan manajemen klinik: Laba Rugi, Arus Kas, LRA, Neraca, Pajak, Piutang/Utang, COA, dan rasio.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh Laporan</button></div></div>
+          <section class="card alert"><b>Catatan pajak & akuntansi</b><br><span class="empty" id="reportDisclaimer">Ini laporan manajemen POC. Final SPT/laporan resmi tetap perlu validasi konsultan pajak/akuntan sesuai status badan usaha, PKP/non-PKP, dan regulasi terbaru.</span></section>
+          <section class="grid">
+            <div class="card metric good"><div class="name">Laba Rugi</div><div class="num" id="reportKpiProfit">-</div><div class="hint">Laba setelah pajak</div></div>
+            <div class="card metric info"><div class="name">Kas Bersih</div><div class="num" id="reportKpiCash">-</div><div class="hint">Mutasi kas periode</div></div>
+            <div class="card metric warn"><div class="name">Total Aset</div><div class="num" id="reportKpiAssets">-</div><div class="hint">Neraca estimasi</div></div>
+            <div class="card metric warn"><div class="name">Utang Pajak</div><div class="num" id="reportKpiTax">-</div><div class="hint">Outstanding pajak</div></div>
+          </section>
+          <section class="card"><h2 class="section-title">Daftar Sub Laporan</h2><div class="grid"><button class="secondary" onclick="showView('reports-profit')">Laba Rugi</button><button class="secondary" onclick="showView('reports-cash')">Arus Kas</button><button class="secondary" onclick="showView('reports-lra')">LRA</button><button class="secondary" onclick="showView('reports-balance')">Neraca</button><button class="secondary" onclick="showView('reports-tax')">Pajak</button><button class="secondary" onclick="showView('reports-receivable')">Piutang & Utang</button><button class="secondary" onclick="showView('reports-coa')">COA & Rasio</button></div></section>
+        </section>
+
+        <section id="view-reports-profit" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Laporan Laba Rugi</h1><div class="sub">Pendapatan, HPP obat/BMHP, beban operasional, EBITDA estimasi, pajak, dan laba bersih.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">Laporan Laba Rugi</h2><div id="reportProfitLoss"></div></section>
+        </section>
+
+        <section id="view-reports-cash" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Laporan Arus Kas</h1><div class="sub">Kas masuk pasien/penjamin, kas keluar operasional, pajak dibayar, dan mutasi kas bersih.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">Arus Kas</h2><div id="reportCashFlow"></div></section>
+        </section>
+
+        <section id="view-reports-lra" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>LRA — Laporan Realisasi Anggaran</h1><div class="sub">Realisasi pendapatan, belanja/HPP, beban operasional, surplus/defisit, dan pajak. Target budget bisa ditambahkan fase berikutnya.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">LRA / Realisasi Operasional</h2><div id="reportLra"></div></section>
+        </section>
+
+        <section id="view-reports-balance" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Neraca / Posisi Keuangan</h1><div class="sub">Aset, liabilitas, dan ekuitas estimasi berbasis data operasional klinik yang tersedia.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">Neraca Estimasi</h2><div id="reportBalance"></div></section>
+        </section>
+
+        <section id="view-reports-tax" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Rekap Pajak</h1><div class="sub">Ringkasan pajak terutang, dibayar, outstanding, status dokumen, dan catatan rekonsiliasi.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="card"><h2 class="section-title">Rekap Pajak</h2><div id="reportTax"></div></section>
+        </section>
+
+        <section id="view-reports-receivable" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>Piutang & Utang</h1><div class="sub">Piutang pasien/penjamin/BPJS dan utang pajak/supplier yang terbaca dari data klinik.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="two-grid"><div class="card"><h2 class="section-title">Piutang</h2><div id="reportReceivable"></div></div><div class="card"><h2 class="section-title">Utang</h2><div id="reportPayable"></div></div></section>
+        </section>
+
+        <section id="view-reports-coa" class="view">
+          <div class="top"><div><div class="eyebrow">Finance Reports</div><h1>COA & Rasio Keuangan</h1><div class="sub">Ringkasan akun COA, mapping laporan, gross margin, net margin, expense ratio, dan collection rate.</div></div><div class="top-actions"><button class="primary" onclick="loadReports()">Refresh</button></div></div>
+          <section class="two-grid"><div class="card"><h2 class="section-title">Ringkasan COA</h2><div id="reportCoa"></div></div><div class="card"><h2 class="section-title">Rasio Keuangan</h2><div id="reportRatios"></div></div></section>
+        </section>
+
       </div>
-      <div class="status" id="uploadStatus">AI belum diaktifkan di POC ini.</div>
-    </section>
-
-    <section class="card hero"><div class="label" id="profitLabel">Net Profit</div><div class="value" id="netProfit">-</div><div class="note" id="profitNote">-</div></section>
-
-    <section class="grid">
-      <div class="card metric"><div class="name">Revenue</div><div class="num" id="revenue">-</div><div class="hint" id="revenueGrowth">Growth -</div></div>
-      <div class="card metric"><div class="name">Profit</div><div class="num" id="profitMini">-</div><div class="hint" id="profitGrowth">Growth -</div></div>
-      <div class="card metric"><div class="name">Cost</div><div class="num" id="costs">-</div><div class="hint">Total biaya</div></div>
-      <div class="card metric"><div class="name">Margin</div><div class="num" id="margin">-</div><div class="hint">Net Profit / Revenue</div></div>
-    </section>
-
-    <section class="card"><h2 class="section-title">Revenue Breakdown</h2><div id="revenueBreakdown"></div></section>
-    <section class="card"><h2 class="section-title">Cost Breakdown</h2><div id="costBreakdown"></div></section>
-    <section class="card"><h2 class="section-title">Revenue vs Profit Harian</h2><canvas id="financeChart" height="170"></canvas><div class="empty" id="chartEmpty" style="display:none">Trend harian belum tersedia.</div></section>
-    <section class="card"><h2 class="section-title">Data Quality</h2><div id="dataQuality"></div></section>
-    <section class="card"><h2 class="section-title">Alert</h2><div id="alerts"></div></section>
+    </main>
   </div>
   <script>
     let chart;
+    let authState={permissions:{}};
+    const viewIds=['dashboard','upload','manual','transactions','reports','reports-profit','reports-cash','reports-lra','reports-balance','reports-tax','reports-receivable','reports-coa'];
     function rupiah(value){const n=Number(value||0),abs=Math.abs(n),sign=n<0?'-':'';return sign+'Rp'+abs.toLocaleString('id-ID')}
     function pct(value){if(value===null||value===undefined||value==='')return'-';return(Number(value)*100).toFixed(1).replace('.0','')+'%'}
     function setText(id,text){document.getElementById(id).textContent=text}
-    function setBusy(id,busy,text){const el=document.getElementById(id);el.disabled=busy;if(text)el.textContent=text}
-    function loadDashboard(){setBusy('refreshBtn',true,'Loading...');const p=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(render).withFailureHandler(err=>{alert(err.message||err);setBusy('refreshBtn',false,'Refresh')}).getDefaultDashboardPayload(p)}
-    function uploadFile(){const file=document.getElementById('fileInput').files[0];if(!file){alert('Pilih file Excel/CSV dulu.');return}setBusy('uploadBtn',true,'Uploading...');setText('uploadStatus','Membaca file...');const reader=new FileReader();reader.onload=function(){const period=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(res=>{if(res&&res.ok===false){setStatus('uploadStatus',res.message||'Upload ditolak.','bad');setBusy('uploadBtn',false,'Upload & Hitung');return}setStatus('uploadStatus','Upload sukses. Rows written: '+res.rowsWritten+', failed: '+res.rowsFailed+'. Period: '+res.period,'ok');setBusy('uploadBtn',false,'Upload & Hitung');if(res.period)document.getElementById('periodInput').value=res.period;loadDashboard()}).withFailureHandler(err=>{setStatus('uploadStatus','Upload gagal: '+(err.message||err),'bad');setBusy('uploadBtn',false,'Upload & Hitung')}).uploadPocFile(reader.result,file.name,file.type,{period:period||undefined})};reader.readAsDataURL(file)}
+    function setBusy(id,busy,text){const el=document.getElementById(id);if(!el)return;el.disabled=busy;if(text)el.textContent=text}
+    function can(permission){return !!(authState&&authState.permissions&&authState.permissions[permission])}
+    function permissionForView(name){return ({dashboard:'viewDashboard',upload:'uploadData',manual:'manualInput',transactions:'manualInput',reports:'viewReports','reports-profit':'viewReports','reports-cash':'viewReports','reports-lra':'viewReports','reports-balance':'viewReports','reports-tax':'viewReports','reports-receivable':'viewReports','reports-coa':'viewReports'})[name]||'viewDashboard'}
+    function applyAuthState(state){authState=state||{permissions:{}};const banner=document.getElementById('authBanner');const msg=document.getElementById('authMessage');setText('authUser',authState.userName||authState.email||'Belum terautentikasi');setText('authEmail',authState.email||authState.message||'-');setText('authRole',authState.roleLabel||authState.role||'No Access');if(!authState.ok){banner.style.display='block';msg.textContent=authState.message||'Akses tidak valid.'}else{banner.style.display='none';msg.textContent=''}document.querySelectorAll('[data-permission]').forEach(el=>{const allowed=can(el.getAttribute('data-permission'));el.classList.toggle('locked',!allowed);el.disabled=!allowed});document.getElementById('view-upload').classList.toggle('hidden-by-role',!can('uploadData'));document.getElementById('view-manual').classList.toggle('hidden-by-role',!can('manualInput'));document.getElementById('view-transactions').classList.toggle('hidden-by-role',!can('manualInput'));viewIds.filter(id=>id.indexOf('reports')===0).forEach(id=>{document.getElementById('view-'+id).classList.toggle('hidden-by-role',!can('viewReports'))});document.getElementById('uploadBtn').disabled=!can('uploadData');document.getElementById('manualBtn').disabled=!can('manualInput')}
+    function loadAuthState(){google.script.run.withSuccessHandler(state=>{applyAuthState(state);if(state&&state.ok){setManualDefaults();if(can('manualInput'))loadManualOptions();loadDashboard()}}).withFailureHandler(err=>{applyAuthState({ok:false,authenticated:false,message:err.message||String(err),permissions:{}})}).getDefaultAuthState()}
+    function showView(name){const perm=permissionForView(name);if(!can(perm)){alert('Role Anda tidak punya akses ke menu ini. Hubungi owner/admin untuk update USER_ACCESS.');return}viewIds.forEach(id=>{document.getElementById('view-'+id).classList.toggle('active',id===name);document.getElementById('nav-'+id).classList.toggle('active',id===name)});if(name==='dashboard'&&!chart)loadDashboard();if(name.indexOf('reports')===0)loadReports();if(name==='transactions')loadTransactions()}
+    function loadDashboard(){setBusy('refreshBtn',true,'Memuat...');const p=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(render).withFailureHandler(err=>{alert(err.message||err);setBusy('refreshBtn',false,'Perbarui')}).getDefaultDashboardPayload(p)}
+    function uploadFile(){if(!can('uploadData')){alert('Role Anda tidak punya akses upload data.');return}const file=document.getElementById('fileInput').files[0];if(!file){alert('Pilih file Excel/CSV dulu.');return}setBusy('uploadBtn',true,'Uploading...');setText('uploadStatus','Membaca file...');const reader=new FileReader();reader.onload=function(){const period=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(res=>{if(res&&res.ok===false){setStatus('uploadStatus',res.message||'Upload ditolak.','bad');setBusy('uploadBtn',false,'Upload & Hitung');return}setStatus('uploadStatus','Upload sukses. Rows written: '+res.rowsWritten+', failed: '+res.rowsFailed+'. Period: '+res.period,'ok');setBusy('uploadBtn',false,'Upload & Hitung');if(res.period)document.getElementById('periodInput').value=res.period;loadDashboard()}).withFailureHandler(err=>{setStatus('uploadStatus','Upload gagal: '+(err.message||err),'bad');setBusy('uploadBtn',false,'Upload & Hitung')}).uploadPocFile(reader.result,file.name,file.type,{period:period||undefined})};reader.readAsDataURL(file)}
     function setStatus(id,text,cls){const el=document.getElementById(id);el.textContent=text;el.className='status '+(cls||'')}
-    function render(payload){setBusy('refreshBtn',false,'Refresh');const s=payload.summary||{};if(payload.period)document.getElementById('periodInput').value=payload.period;setText('subtitle',`${payload.clinicId} • Period ${payload.period} • ${payload.generatedAt}`);setText('profitLabel',s.financeFinal?'Final Net Profit':'Estimated / Non-final Profit');setText('netProfit',rupiah(s.netProfit));setText('profitMini',rupiah(s.netProfit));setText('profitNote',`Trust: ${s.financeLabel||'unknown'} • Data: ${s.dataStatus||'unknown'} • Trace: ${s.traceStatus||'unknown'} • Gross profit ${rupiah(s.grossProfit)}`);setText('revenue',rupiah(s.totalRevenue));setText('costs',rupiah(s.totalCost));setText('margin',pct(s.profitMargin));setText('revenueGrowth','Growth '+pct(s.revenueGrowth));setText('profitGrowth','Growth '+pct(s.profitGrowth));renderBreakdown('revenueBreakdown',payload.revenueBreakdown||[]);renderBreakdown('costBreakdown',payload.costBreakdown||[]);renderDataQuality(payload.dataQualityWarnings||[]);renderAlerts(payload.alerts||[]);renderChart(payload.trend||[])}
+    function render(payload){setBusy('refreshBtn',false,'Perbarui');const s=payload.summary||{};if(payload.period)document.getElementById('periodInput').value=payload.period;setText('subtitle',`${payload.clinicId} • Period ${payload.period} • ${payload.generatedAt}`);setText('profitLabel',s.financeFinal?'Laba Bersih Final':'Laba Estimasi');setText('netProfit',rupiah(s.netProfit));setText('profitMini',rupiah(s.netProfit));setText('profitNote',`Status ${s.financeLabel||'unknown'} • Data ${s.dataStatus||'unknown'} • Trace ${s.traceStatus||'unknown'} • Laba kotor ${rupiah(s.grossProfit)}`);setText('heroRevenue','Omzet '+rupiah(s.totalRevenue));setText('heroCost','Biaya '+rupiah(s.totalCost));setText('heroMargin','Margin '+pct(s.profitMargin));setText('revenue',rupiah(s.totalRevenue));setText('costs',rupiah(s.totalCost));setText('margin',pct(s.profitMargin));setText('revenueGrowth','Perubahan '+pct(s.revenueGrowth));setText('profitGrowth','Perubahan '+pct(s.profitGrowth));renderBreakdown('revenueBreakdown',payload.revenueBreakdown||[]);renderBreakdown('costBreakdown',payload.costBreakdown||[]);renderDataQuality(payload.dataQualityWarnings||[]);renderDashboardAlerts((payload.aiAnalysis&&payload.aiAnalysis.generatedAlerts)||payload.alerts||[]);renderAiAnalysis(payload.aiAnalysis||{});renderAlerts(payload.alerts||[]);renderChart(payload.trend||[])}
     function clearNode(el){while(el.firstChild)el.removeChild(el.firstChild)}
     function appendEmpty(el,text){const d=document.createElement('div');d.className='empty';d.textContent=text;el.appendChild(d)}
-    function renderBreakdown(id,rows){const el=document.getElementById(id);clearNode(el);if(!rows.length){appendEmpty(el,'Belum ada data.');return}rows.forEach(r=>{const row=document.createElement('div');row.className='row';const left=document.createElement('div');const cat=document.createElement('div');cat.className='cat';cat.textContent=r.category||'unknown';const share=document.createElement('div');share.className='empty';share.textContent=pct(r.pctOfTotal)+' of total';const amt=document.createElement('div');amt.className='amt';amt.textContent=rupiah(r.amount);left.appendChild(cat);left.appendChild(share);row.appendChild(left);row.appendChild(amt);el.appendChild(row)})}
+    function renderBreakdown(id,rows){const el=document.getElementById(id);clearNode(el);if(!rows.length){appendEmpty(el,'Belum ada data.');return}rows.forEach(r=>{const row=document.createElement('div');row.className='row';const left=document.createElement('div');left.style.flex='1';const cat=document.createElement('div');cat.className='cat';cat.textContent=r.category||'unknown';const share=document.createElement('div');share.className='empty';share.textContent=pct(r.pctOfTotal)+' dari total';const track=document.createElement('div');track.className='progress-track';const bar=document.createElement('div');bar.className='progress-bar';bar.style.width=Math.max(3,Math.min(100,Number(r.pctOfTotal||0)*100))+'%';track.appendChild(bar);const amt=document.createElement('div');amt.className='amt';amt.textContent=rupiah(r.amount);left.appendChild(cat);left.appendChild(share);left.appendChild(track);row.appendChild(left);row.appendChild(amt);el.appendChild(row)})}
     function renderDataQuality(rows){const el=document.getElementById('dataQuality');clearNode(el);if(!rows.length){appendEmpty(el,'Tidak ada data quality issue aktif untuk periode ini.');return}rows.forEach(q=>{const card=document.createElement('div');card.className='alert '+String(q.severity||'');const title=document.createElement('b');title.textContent=String(q.severity||'').toUpperCase()+' — '+(q.issueType||'data_quality');const br=document.createElement('br');const msg=document.createElement('span');msg.className='empty';msg.textContent=(q.targetSheet||'sheet')+' row '+(q.rowNumber||'-')+' '+(q.columnName||'')+': '+(q.message||'');card.appendChild(title);card.appendChild(br);card.appendChild(msg);el.appendChild(card)})}
     function renderAlerts(rows){const el=document.getElementById('alerts');clearNode(el);if(!rows.length){appendEmpty(el,'Tidak ada alert aktif.');return}rows.forEach(a=>{const card=document.createElement('div');card.className='alert '+String(a.severity||'');const title=document.createElement('b');title.textContent=String(a.severity||'').toUpperCase()+' — '+(a.title||'Alert');const br=document.createElement('br');const msg=document.createElement('span');msg.className='empty';msg.textContent=a.message||'';card.appendChild(title);card.appendChild(br);card.appendChild(msg);el.appendChild(card)})}
-    function renderChart(rows){const ctx=document.getElementById('financeChart');document.getElementById('chartEmpty').style.display=rows.length?'none':'block';if(chart)chart.destroy();chart=new Chart(ctx,{type:'line',data:{labels:rows.map(r=>r.date),datasets:[{label:'Revenue',data:rows.map(r=>r.totalRevenue),borderColor:'#2563eb',tension:.35},{label:'Profit',data:rows.map(r=>r.netProfit),borderColor:'#059669',tension:.35},{label:'Cost',data:rows.map(r=>r.totalCost),borderColor:'#dc2626',tension:.35}]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{ticks:{callback:v=>rupiah(v)}}}}})}
-    window.onload=loadDashboard;
+    function renderDashboardAlerts(rows){const el=document.getElementById('dashboardAlerts');clearNode(el);rows=(rows||[]).slice(0,3);if(!rows.length){appendEmpty(el,'Tidak ada alert prioritas. Kondisi KPI terlihat normal untuk data yang tersedia.');return}rows.forEach(a=>{const card=document.createElement('div');card.className='alert '+String(a.severity||'');const title=document.createElement('b');title.textContent=String(a.severity||'').toUpperCase()+' — '+(a.title||'Alert');const br=document.createElement('br');const msg=document.createElement('span');msg.className='empty';msg.textContent=a.message||'';card.appendChild(title);card.appendChild(br);card.appendChild(msg);el.appendChild(card)})}
+    function renderAiAnalysis(analysis){const el=document.getElementById('aiAnalysis');clearNode(el);if(!analysis||!analysis.insights){appendEmpty(el,'Analisa belum tersedia. Upload/input data dulu supaya insight lebih akurat.');return}const ul=document.createElement('ul');ul.className='insight-list';(analysis.insights||[]).slice(0,3).forEach(text=>{const li=document.createElement('li');li.textContent=text;ul.appendChild(li)});el.appendChild(ul);if((analysis.recommendedActions||[]).length){const action=document.createElement('div');action.className='template-box';action.style.marginTop='12px';const b=document.createElement('b');b.textContent='Rekomendasi berikutnya';action.appendChild(b);const list=document.createElement('ul');list.className='template-list muted';analysis.recommendedActions.slice(0,3).forEach(text=>{const li=document.createElement('li');li.textContent=text;list.appendChild(li)});action.appendChild(list);el.appendChild(action)}const note=document.createElement('div');note.className='toolbar-note';note.style.marginTop='10px';note.textContent=analysis.disclaimer||'Analisa berbasis data yang tersedia.';el.appendChild(note)}
+    function renderChart(rows){const ctx=document.getElementById('financeChart');document.getElementById('chartEmpty').style.display=rows.length?'none':'block';if(chart)chart.destroy();chart=new Chart(ctx,{type:'line',data:{labels:rows.map(r=>r.date),datasets:[{label:'Omzet',data:rows.map(r=>r.totalRevenue),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.08)',fill:true,tension:.35,pointRadius:2},{label:'Laba',data:rows.map(r=>r.netProfit),borderColor:'#047857',backgroundColor:'rgba(4,120,87,.08)',fill:true,tension:.35,pointRadius:2},{label:'Biaya',data:rows.map(r=>r.totalCost),borderColor:'#be123c',backgroundColor:'rgba(190,18,60,.06)',fill:true,tension:.35,pointRadius:2}]},options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8}}},scales:{x:{grid:{display:false}},y:{grid:{color:'#edf2f7'},ticks:{callback:v=>rupiah(v)}}}}})}
+    function xmlEscape(value){return String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+    function sheetXml(name,headers,rows){let xml='<Worksheet ss:Name="'+xmlEscape(name)+'"><Table><Row>';headers.forEach(h=>{xml+='<Cell><Data ss:Type="String">'+xmlEscape(h)+'</Data></Cell>'});xml+='</Row>';rows.forEach(row=>{xml+='<Row>';headers.forEach(h=>{const value=row[h]||'';const isNumber=value!==''&&!isNaN(Number(value))&&String(value).match(/^[-]?\d+(\.\d+)?$/);xml+='<Cell><Data ss:Type="'+(isNumber?'Number':'String')+'">'+xmlEscape(value)+'</Data></Cell>'});xml+='</Row>'});return xml+'</Table></Worksheet>'}
+    function downloadClinicTemplate(){
+      const wb=XLSX.utils.book_new();
+      const instructionRows=[
+        ['Bagian','Petunjuk'],
+        ['Umum','Isi data per sheet sesuai jenis data. Minimal untuk dashboard profit: PENDAPATAN dan BIAYA.'],
+        ['Privasi','Jangan isi nama pasien, NIK, nomor HP, alamat, diagnosis, rekam medis, atau catatan klinis. Pakai Kode Pasien Anonim bila perlu.'],
+        ['Tanggal','Gunakan format YYYY-MM-DD, contoh 2026-06-01.'],
+        ['Nominal','Isi angka saja tanpa Rp, titik/koma ribuan, contoh 150000.'],
+        ['Qty','Isi jumlah item/transaksi. Bila tidak tahu, isi 1.'],
+        ['Dokter/Poli','Boleh isi kode atau nama pendek, contoh dr_001 / umum.'],
+        ['Penjamin','Contoh: umum, bpjs, asuransi, perusahaan.'],
+        ['Metode Bayar','Contoh: cash, transfer, qris, debit, bpjs.'],
+        ['Kunjungan vs Pendapatan','Kunjungan adalah registrasi/encounter tanpa nominal. Pendapatan adalah transaksi uang/tagihan.'],
+        ['Pajak','Sheet PAJAK opsional untuk rekap kewajiban pajak. Finalisasi tetap perlu validasi konsultan pajak/akuntan.'],
+        ['Upload','Setelah diisi, upload file ini di menu Upload Data lalu klik Upload & Hitung.']
+      ];
+      const sheets=[
+        {name:'PETUNJUK', rows:instructionRows, widths:[24,95], freeze:false},
+        {name:'REFERENSI', widths:[24,34,70], rows:[
+          ['Jenis','Nilai yang Disarankan','Catatan'],
+          ['Jenis Pendapatan','konsultasi, tindakan, obat, laboratorium, administrasi, lainnya','Boleh ditambah sesuai kebutuhan klinik.'],
+          ['Kategori Biaya','gaji, sewa, obat_bmhp, utilitas, marketing, maintenance, administrasi, operasional','Gunakan konsisten tiap bulan.'],
+          ['Tipe Kunjungan','rawat_jalan, kontrol, screening, kia, gigi, administrasi','Tidak berisi nominal.'],
+          ['Status Kunjungan','registered, waiting, in_service, completed, cancelled','Untuk tracking operasional layanan.'],
+          ['Status Pasien','baru, lama, kontrol','Jangan isi nama pasien/NIK/no HP.'],
+          ['Jenis Pajak','PPh Final UMKM, PPh 21, PPh 23, PPN Keluaran, PPN Masukan, Pajak Daerah','Opsional untuk rekap manajemen.']
+        ], freeze:false},
+        {name:'PENDAPATAN', widths:[18,20,28,10,16,18,14,18,16,16,18,18,18,14], rows:[
+          ['Tanggal Transaksi','Jenis Pendapatan','Nama Layanan/Item','Jumlah','Harga Satuan','Pendapatan Kotor','Diskon','Pendapatan Bersih','Terbayar','Piutang','Metode Bayar','Jenis Pasien/Penjamin','Dokter','Poli'],
+          ['2026-06-01','tindakan','Konsultasi Dokter',10,150000,1500000,0,1500000,1500000,0,'cash','umum','dr_001','umum']
+        ]},
+        {name:'BIAYA', widths:[16,22,30,16,18,24,18], rows:[
+          ['Tanggal Biaya','Kategori Biaya','Nama Biaya/Keterangan','Nominal','Metode Bayar','Vendor/Supplier','Jenis Biaya'],
+          ['2026-06-01','operasional','Gaji staff',5000000,'transfer','','operational']
+        ]},
+        {name:'KUNJUNGAN', widths:[18,16,20,18,22,18,18,14,22,34,18], rows:[
+          ['Tanggal Kunjungan','Jam Registrasi','Tipe Kunjungan','Status Kunjungan','Kode Pasien Anonim','Status Pasien','Penjamin','Dokter','Poli','Tujuan Kunjungan/Layanan Administratif','Status Data'],
+          ['2026-06-01','08:30','rawat_jalan','completed','anon_001','baru','umum','dr_001','umum','Registrasi rawat jalan','complete']
+        ]},
+        {name:'TINDAKAN', widths:[18,28,22,10,16,18,14,18,16,14], rows:[
+          ['Tanggal Tindakan','Nama Tindakan','Kategori Tindakan','Jumlah','Harga Satuan','Pendapatan Kotor','Diskon','Pendapatan Bersih','Dokter','Poli'],
+          ['2026-06-01','Konsultasi Dokter','konsultasi',1,150000,150000,0,150000,'dr_001','umum']
+        ]},
+        {name:'RESEP', widths:[16,30,10,12,16,18,14,18,16], rows:[
+          ['Tanggal Resep','Nama Obat/Item','Jumlah','Satuan','Harga Jual','Pendapatan Kotor','Diskon','Pendapatan Bersih','HPP/Modal'],
+          ['2026-06-01','Paracetamol 500mg',10,'tablet',2000,20000,0,20000,12000]
+        ]},
+        {name:'PAJAK', widths:[14,22,18,18,14,16,16,20,38], rows:[
+          ['Masa Pajak','Jenis Pajak','Omzet Kena Pajak','DPP/Dasar Pengenaan Pajak','Tarif Pajak','Pajak Terutang','Pajak Dibayar','Status Dokumen','Catatan Pajak'],
+          ['2026-06','PPh Final UMKM',10000000,10000000,0.005,50000,0,'draft','Estimasi manajemen, validasi dengan konsultan pajak']
+        ]}
+      ];
+      sheets.forEach(spec=>{
+        const ws=XLSX.utils.aoa_to_sheet(spec.rows);
+        ws['!cols']=(spec.widths||[]).map(w=>({wch:w}));
+        if(spec.freeze!==false) ws['!freeze']={xSplit:0,ySplit:1};
+        XLSX.utils.book_append_sheet(wb,ws,spec.name);
+      });
+      XLSX.writeFile(wb,'template-data-klinik-ai-clinic.xlsx');
+    }
+
+    function renderReportRows(id,rows){const el=document.getElementById(id);clearNode(el);if(!rows||!rows.length){appendEmpty(el,'Belum ada data laporan.');return}rows.forEach(r=>{const row=document.createElement('div');row.className='row';const left=document.createElement('div');const cat=document.createElement('div');cat.className='cat';cat.textContent=r.label||r.taxType||'-';const note=document.createElement('div');note.className='empty';note.textContent=r.note||r.notes||r.documentStatus||'';const amt=document.createElement('div');amt.className='amt';amt.textContent=rupiah(r.amount!==undefined?r.amount:(r.taxPayable||0));left.appendChild(cat);left.appendChild(note);row.appendChild(left);row.appendChild(amt);el.appendChild(row)})}
+    function loadReports(){if(!can('viewReports')){alert('Role Anda tidak punya akses laporan keuangan.');return}const p=document.getElementById('periodInput').value;google.script.run.withSuccessHandler(renderReports).withFailureHandler(err=>alert(err.message||err)).getDefaultFinancialReportPayload(p)}
+    function renderRatioRows(id,rows){const el=document.getElementById(id);clearNode(el);if(!rows||!rows.length){appendEmpty(el,'Belum ada data rasio.');return}rows.forEach(r=>{const row=document.createElement('div');row.className='row';const left=document.createElement('div');const cat=document.createElement('div');cat.className='cat';cat.textContent=r.label||'-';const note=document.createElement('div');note.className='empty';note.textContent=(r.ratio===null||r.ratio===undefined?'Rasio belum tersedia':pct(r.ratio))+' • '+(r.note||'');const amt=document.createElement('div');amt.className='amt';amt.textContent=rupiah(r.amount||0);left.appendChild(cat);left.appendChild(note);row.appendChild(left);row.appendChild(amt);el.appendChild(row)})}
+    function amountFrom(rows,label){const hit=(rows||[]).find(r=>String(r.label||'').toLowerCase().indexOf(label)>=0);return hit?hit.amount:0}
+    function renderReports(payload){payload=payload||{};setText('reportDisclaimer',payload.disclaimer||'Laporan manajemen POC; final tetap perlu validasi profesional.');renderReportRows('reportProfitLoss',payload.labaRugi||[]);renderReportRows('reportCashFlow',payload.arusKas||[]);renderReportRows('reportLra',payload.lra||[]);renderReportRows('reportBalance',payload.neraca||payload.posisiKeuangan||[]);renderReportRows('reportTax',(payload.pajak||[]).map(t=>({label:t.taxType,amount:t.taxPayable,note:'Tarif '+pct(t.taxRate)+' • dibayar '+rupiah(t.taxPaid)+' • outstanding '+rupiah(t.taxOutstanding)+' • '+(t.notes||'')})));renderReportRows('reportReceivable',payload.piutang||[]);renderReportRows('reportPayable',payload.utang||[]);renderReportRows('reportCoa',payload.coaSummary||[]);renderRatioRows('reportRatios',payload.rasio||[]);setText('reportKpiProfit',rupiah(amountFrom(payload.labaRugi,'laba setelah pajak')));setText('reportKpiCash',rupiah(amountFrom(payload.arusKas,'kas bersih')));setText('reportKpiAssets',rupiah(amountFrom(payload.neraca,'total aset')));setText('reportKpiTax',rupiah((payload.pajak||[]).reduce((a,t)=>a+Number(t.taxOutstanding||0),0)))}
+    function loadTransactions(){if(!can('manualInput')){alert('Role Anda tidak punya akses detail transaksi.');return}setManualDefaults();const type=val('transactionType')||'all';const period=val('transactionPeriod')||document.getElementById('periodInput').value||currentMonth();setStatus('transactionStatus','Memuat transaksi...','');google.script.run.withSuccessHandler(renderTransactions).withFailureHandler(err=>setStatus('transactionStatus','Gagal memuat transaksi: '+(err.message||err),'bad')).getDefaultTransactionListPayload(type,period,100)}
+    function renderTransactions(payload){const body=document.getElementById('transactionRows');clearNode(body);const rows=(payload&&payload.rows)||[];setText('transactionSummary',(payload&&payload.totalCount!==undefined?payload.totalCount:rows.length)+' transaksi ditemukan untuk '+((payload&&payload.period)||'-'));setStatus('transactionStatus',rows.length?'Menampilkan '+rows.length+' transaksi terbaru.':'Belum ada transaksi pada filter ini.',rows.length?'ok':'');if(!rows.length){const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=7;td.className='empty';td.textContent='Belum ada transaksi. Coba input transaksi baru atau upload data.';tr.appendChild(td);body.appendChild(tr);return}rows.forEach(r=>{const tr=document.createElement('tr');const cells=[r.date||'-',r.type||'-',r.category||'-',r.description||'-',r.amount?rupiah(r.amount):'-',[r.doctor,r.poli].filter(Boolean).join(' / ')||r.payerType||'-',r.status||'-'];cells.forEach((text,i)=>{const td=document.createElement('td');if(i===1){const chip=document.createElement('span');chip.className='type-chip';chip.textContent=text;td.appendChild(chip)}else if(i===4){td.className=Number(r.amount||0)<0?'amount-neg':'amount-pos';td.textContent=text}else{td.textContent=text}tr.appendChild(td)});body.appendChild(tr)})}
+    let manualOptions={};
+    function todayIso(){return new Date().toISOString().slice(0,10)}
+    function currentMonth(){return new Date().toISOString().slice(0,7)}
+    function val(id){const el=document.getElementById(id);return el?el.value:''}
+    function syncPeriodInput(period){if(period)document.getElementById('periodInput').value=period}
+    function fillSelect(id,items,placeholder){const el=document.getElementById(id);if(!el)return;clearNode(el);if(placeholder){const opt=document.createElement('option');opt.value='';opt.textContent=placeholder;el.appendChild(opt)};(items||[]).forEach(item=>{const opt=document.createElement('option');opt.value=item.value;opt.textContent=item.label+(item.meta?' — '+item.meta:'');el.appendChild(opt)})}
+    function populateManualOptions(options){manualOptions=options||{};fillSelect('revCategory',manualOptions.revenueCategories,'Pilih jenis pendapatan');fillSelect('expCategory',manualOptions.expenseCategories,'Pilih kategori biaya');fillSelect('taxType',manualOptions.taxTypes,'Pilih jenis pajak');fillSelect('visitCategory',manualOptions.visitCategories,'Pilih kategori layanan');['revPayment','expPayment'].forEach(id=>fillSelect(id,manualOptions.paymentMethods,'Pilih metode bayar'));['revPayer','visitPayer'].forEach(id=>fillSelect(id,manualOptions.payerTypes,'Pilih penjamin'));['revDoctor','visitDoctor'].forEach(id=>fillSelect(id,manualOptions.doctors,'Pilih dokter'));['revPoli','visitPoli'].forEach(id=>fillSelect(id,manualOptions.polis,'Pilih poli'));fillSelect('expAccount',manualOptions.coa,'Opsional: pilih akun COA');setManualDefaults();updateManualHelp()}
+    function setManualDefaults(){const today=todayIso(),month=currentMonth();['revDate','expDate','visitDate'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.value)el.value=today});['taxPeriod','manualPeriodHint','transactionPeriod'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.value)el.value=month});if(!document.getElementById('periodInput').value)document.getElementById('periodInput').value=month}
+    function loadManualOptions(){google.script.run.withSuccessHandler(populateManualOptions).withFailureHandler(err=>{setStatus('manualStatus','Gagal memuat pilihan master data: '+(err.message||err),'bad');populateManualOptions({})}).getDefaultManualInputOptions()}
+    function updateManualHelp(){const t=document.getElementById('manualType').value;['pendapatan','biaya','pajak','kunjungan'].forEach(name=>{const el=document.getElementById('manual-'+name);if(el)el.style.display=name===t?'block':'none'});const help={pendapatan:'Pendapatan = transaksi uang/tagihan. Isi layanan/item, nominal, metode bayar, terbayar/piutang, dokter/poli bila terkait.',biaya:'Biaya = pengeluaran klinik. Isi kategori biaya, nominal, metode bayar, vendor, jenis biaya, dan COA bila tersedia.',pajak:'Pajak = rekap kewajiban pajak bulanan. Gunakan masa pajak, DPP, tarif, pajak terutang/dibayar, dan status dokumen.',kunjungan:'Kunjungan = data registrasi/encounter pasien, bukan transaksi uang. Tidak ada nominal/metode bayar; pakai kode pasien anonim, jam registrasi, status pasien, dokter/poli, dan status kunjungan.'};setText('manualHelp',help[t]||'Isi data manual sesuai jenis data.');setManualDefaults()}
+    function saveManualEntry(){if(!can('manualInput')){alert('Role Anda tidak punya akses input manual.');return}const type=val('manualType');let entry={type:type};if(type==='pendapatan'){entry={type,date:val('revDate'),period:val('revDate').slice(0,7),category:val('revCategory'),description:val('revDescription'),quantity:val('revQuantity'),unitPrice:val('revUnitPrice'),amount:val('revAmount')||val('revUnitPrice'),discountAmount:val('revDiscount'),paidAmount:val('revPaid')||val('revAmount'),receivableAmount:val('revReceivable'),paymentMethod:val('revPayment'),payerType:val('revPayer'),doctor:val('revDoctor'),poli:val('revPoli')}}
+      else if(type==='biaya'){entry={type,date:val('expDate'),period:val('expDate').slice(0,7),category:val('expCategory'),description:val('expDescription'),amount:val('expAmount'),paymentMethod:val('expPayment'),vendor:val('expVendor'),costType:val('expCostType'),accountId:val('expAccount')}}
+      else if(type==='pajak'){entry={type,date:val('taxPeriod')+'-01',period:val('taxPeriod'),taxPeriod:val('taxPeriod'),category:val('taxType'),taxType:val('taxType'),taxableRevenue:val('taxableRevenue'),taxBaseAmount:val('taxBaseAmount'),taxRate:val('taxRate'),taxPayable:val('taxPayable'),taxPaid:val('taxPaid'),amount:val('taxPayable'),documentStatus:val('taxDocStatus'),notes:val('taxNotes'),description:val('taxNotes')}}
+      else if(type==='kunjungan'){entry={type,date:val('visitDate'),period:val('visitDate').slice(0,7),category:val('visitCategory'),description:val('visitServiceName'),registrationTime:val('visitTime'),patientRef:val('visitPatientRef'),patientType:val('visitPatientType'),payerType:val('visitPayer'),doctor:val('visitDoctor'),poli:val('visitPoli'),status:val('visitStatus')}}
+      const period=entry.period||currentMonth();if(!period){alert('Tanggal/periode wajib diisi.');return}if((type==='pendapatan'||type==='biaya')&&!Number(entry.amount||0)){alert('Nominal wajib diisi dengan angka.');return}if(type==='pajak'&&!Number(entry.taxPayable||0)){alert('Pajak terutang wajib diisi dengan angka.');return}syncPeriodInput(period);setBusy('manualBtn',true,'Menyimpan...');google.script.run.withSuccessHandler(res=>{setBusy('manualBtn',false,'Simpan & Hitung KPI');setStatus('manualStatus','Tersimpan ke '+res.sheetName+'. Period: '+res.period+'. KPI dihitung ulang.','ok');if(res.period)syncPeriodInput(res.period);loadDashboard()}).withFailureHandler(err=>{setBusy('manualBtn',false,'Simpan & Hitung KPI');setStatus('manualStatus','Gagal simpan: '+(err.message||err),'bad')}).saveDefaultManualClinicEntry(entry)}
+
+    window.onload=function(){loadAuthState()};
   </script>
 </body>
 </html>
