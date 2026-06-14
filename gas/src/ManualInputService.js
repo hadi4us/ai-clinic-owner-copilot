@@ -148,25 +148,25 @@ function getTransactionListPayloadForContext_(context, type, period, limit) {
   if (include('pendapatan')) {
     getRowsAsObjects_('PENDAPATAN').filter(row => transactionRowInScope_(row, context, row.transaction_date, normalizedPeriod)).forEach(row => rows.push({
       type: 'pendapatan', date: toIsoDateString_(row.transaction_date), category: row.revenue_type || '', description: row.item_name || '', amount: asNumber_(row.net_amount, 0),
-      paymentMethod: row.payment_method || '', payerType: row.payer_type || '', doctor: row.doctor_id || '', poli: row.poli_id || '', status: row.status || '', importId: row.import_id || '', id: row.revenue_id || row.transaction_id || ''
+      paymentMethod: row.payment_method || '', payerType: row.payer_type || '', doctor: row.doctor_id || '', poli: row.poli_id || '', status: row.status || '', importId: row.import_id || '', id: row.revenue_id || row.transaction_id || '', sourceSheet: 'PENDAPATAN', editable: isManualTransactionRow_(row)
     }));
   }
   if (include('biaya')) {
     getRowsAsObjects_('BIAYA').filter(row => transactionRowInScope_(row, context, row.expense_date, normalizedPeriod)).forEach(row => rows.push({
       type: 'biaya', date: toIsoDateString_(row.expense_date), category: row.expense_category || '', description: row.expense_name || '', amount: -Math.abs(asNumber_(row.amount, 0)),
-      paymentMethod: row.payment_method || '', payerType: '', doctor: '', poli: '', status: row.status || '', importId: row.import_id || '', id: row.expense_id || ''
+      paymentMethod: row.payment_method || '', payerType: '', doctor: '', poli: '', status: row.status || '', importId: row.import_id || '', id: row.expense_id || '', accountId: row.account_id || '', costType: row.cost_type || '', sourceSheet: 'BIAYA', editable: isManualTransactionRow_(row)
     }));
   }
   if (include('pajak')) {
     getRowsAsObjects_('PAJAK').filter(row => transactionRowInScope_(row, context, row.tax_period, normalizedPeriod)).forEach(row => rows.push({
       type: 'pajak', date: String(row.tax_period || normalizedPeriod).slice(0, 7), category: row.tax_type || '', description: row.notes || row.document_status || 'Rekap pajak', amount: -Math.abs(asNumber_(row.tax_payable, 0)),
-      paymentMethod: '', payerType: '', doctor: '', poli: '', status: row.document_status || '', importId: row.import_id || '', id: row.tax_id || ''
+      paymentMethod: '', payerType: '', doctor: '', poli: '', status: row.document_status || '', importId: row.import_id || '', id: row.tax_id || '', sourceSheet: 'PAJAK', editable: isManualTransactionRow_(row)
     }));
   }
   if (include('kunjungan')) {
     getRowsAsObjects_('KUNJUNGAN').filter(row => transactionRowInScope_(row, context, row.visit_date, normalizedPeriod)).forEach(row => rows.push({
       type: 'kunjungan', date: toIsoDateString_(row.visit_date), category: row.service_category || '', description: row.service_name || '', amount: 0,
-      paymentMethod: '', payerType: row.payer_type || row.patient_type || '', doctor: row.doctor_id || '', poli: row.poli_id || '', status: row.status || '', importId: row.import_id || '', id: row.visit_id || '', patientRef: row.patient_ref || ''
+      paymentMethod: '', payerType: row.payer_type || row.patient_type || '', doctor: row.doctor_id || '', poli: row.poli_id || '', status: row.status || '', importId: row.import_id || '', id: row.visit_id || '', patientRef: row.patient_ref || '', sourceSheet: 'KUNJUNGAN', editable: isManualTransactionRow_(row)
     }));
   }
   rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id || '').localeCompare(String(a.id || '')));
@@ -182,6 +182,134 @@ function getTransactionListPayloadForContext_(context, type, period, limit) {
     availablePeriods: getAvailableTransactionPeriodsForContext_(context).slice(-18),
     generatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
   };
+}
+
+function updateDefaultTransactionEntry(transaction) {
+  const context = resolveRequestContext_({}, {}, 'finance');
+  return updateTransactionEntryForContext_(context, transaction || {});
+}
+
+function deleteDefaultTransactionEntry(type, id) {
+  const context = resolveRequestContext_({}, {}, 'finance');
+  return deleteTransactionEntryForContext_(context, type, id);
+}
+
+function updateTransactionEntryForContext_(context, transaction) {
+  assertTenantScope_(context.tenantId, context.clinicId);
+  const type = normalizeHeaderKey_(transaction.type || '');
+  const id = String(transaction.id || '').trim();
+  const config = getTransactionMutationConfig_(type);
+  if (!config || !id) throw new Error('TRANSACTION_UPDATE_INVALID: jenis/id transaksi tidak valid.');
+  let updated = null;
+  return withTenantClinicLock_('update_transaction_entry', context.tenantId, context.clinicId, function() {
+    updateObjectsWhere_(config.sheet, function(row) { return rowMatchesTransactionId_(row, config.idFields, id) && inScope_(row, context.tenantId, context.clinicId); }, function(row) {
+      if (!isManualTransactionRow_(row)) throw new Error('TRANSACTION_IMMUTABLE: transaksi hasil import/SIM tidak boleh diedit langsung. Buat koreksi/reversal.');
+      const next = applyTransactionPatch_(type, row, transaction);
+      updated = next;
+      return next;
+    });
+    if (!updated) throw new Error('TRANSACTION_NOT_FOUND: transaksi tidak ditemukan.');
+    const period = getTransactionPeriodFromRow_(type, updated);
+    computePocKpisNoLock_(context.tenantId, context.clinicId, period);
+    invalidateDashboardCache_(context.tenantId, context.clinicId);
+    writeAudit_(context.userEmail || 'owner', 'owner', 'transaction_update', config.sheet, { targetId: id, period: period, type: type });
+    return { ok: true, action: 'updated', type: type, id: id, period: period, row: updated };
+  });
+}
+
+function deleteTransactionEntryForContext_(context, type, id) {
+  assertTenantScope_(context.tenantId, context.clinicId);
+  const normalizedType = normalizeHeaderKey_(type || '');
+  const config = getTransactionMutationConfig_(normalizedType);
+  const targetId = String(id || '').trim();
+  if (!config || !targetId) throw new Error('TRANSACTION_DELETE_INVALID: jenis/id transaksi tidak valid.');
+  let removed = null;
+  return withTenantClinicLock_('delete_transaction_entry', context.tenantId, context.clinicId, function() {
+    const rows = getRowsAsObjects_(config.sheet);
+    const kept = [];
+    rows.forEach(function(row) {
+      const match = rowMatchesTransactionId_(row, config.idFields, targetId) && inScope_(row, context.tenantId, context.clinicId);
+      if (!match) { kept.push(row); return; }
+      if (!isManualTransactionRow_(row)) throw new Error('TRANSACTION_IMMUTABLE: transaksi hasil import/SIM tidak boleh dihapus langsung. Buat koreksi/reversal.');
+      removed = row;
+    });
+    if (!removed) throw new Error('TRANSACTION_NOT_FOUND: transaksi tidak ditemukan.');
+    replaceObjects_(config.sheet, kept);
+    const period = getTransactionPeriodFromRow_(normalizedType, removed);
+    computePocKpisNoLock_(context.tenantId, context.clinicId, period);
+    invalidateDashboardCache_(context.tenantId, context.clinicId);
+    writeAudit_(context.userEmail || 'owner', 'owner', 'transaction_delete', config.sheet, { targetId: targetId, period: period, type: normalizedType });
+    return { ok: true, action: 'deleted', type: normalizedType, id: targetId, period: period };
+  });
+}
+
+function getTransactionMutationConfig_(type) {
+  return {
+    pendapatan: { sheet: 'PENDAPATAN', idFields: ['revenue_id', 'transaction_id'] },
+    biaya: { sheet: 'BIAYA', idFields: ['expense_id'] },
+    pajak: { sheet: 'PAJAK', idFields: ['tax_id'] },
+    kunjungan: { sheet: 'KUNJUNGAN', idFields: ['visit_id'] },
+  }[type] || null;
+}
+
+function rowMatchesTransactionId_(row, idFields, id) {
+  return (idFields || []).some(function(field) { return String(row[field] || '') === String(id || ''); });
+}
+
+function isManualTransactionRow_(row) {
+  return String(row.import_id || '').indexOf('manual_') === 0 || String(row.source_row_id || '').indexOf('manual_') === 0;
+}
+
+function applyTransactionPatch_(type, row, patch) {
+  const next = Object.assign({}, row);
+  const now = new Date();
+  const description = String(patch.description || '').trim();
+  const category = String(patch.category || '').trim();
+  const status = String(patch.status || '').trim();
+  const paymentMethod = String(patch.paymentMethod || '').trim();
+  const amount = patch.amount === undefined || patch.amount === '' ? null : Math.abs(asNumber_(patch.amount, 0));
+  const date = String(patch.date || '').trim();
+  if (type === 'pendapatan') {
+    if (date) next.transaction_date = date;
+    if (category) next.revenue_type = category;
+    if (description) next.item_name = description;
+    if (amount !== null) { next.net_amount = amount; next.gross_amount = amount; next.paid_amount = amount; }
+    if (paymentMethod) next.payment_method = paymentMethod;
+    if (status) next.status = status;
+  } else if (type === 'biaya') {
+    if (date) next.expense_date = date;
+    if (category) next.expense_category = category;
+    if (description) next.expense_name = description;
+    if (amount !== null) next.amount = amount;
+    if (paymentMethod) next.payment_method = paymentMethod;
+    if (String(patch.vendor || '').trim()) next.vendor_name = String(patch.vendor || '').trim();
+    if (String(patch.accountId || '').trim()) next.account_id = String(patch.accountId || '').trim();
+    if (String(patch.costType || '').trim()) next.cost_type = String(patch.costType || '').trim();
+    if (status) next.status = status;
+  } else if (type === 'pajak') {
+    if (date) next.tax_period = String(date).slice(0, 7);
+    if (category) next.tax_type = category;
+    if (description) next.notes = description;
+    if (amount !== null) next.tax_payable = amount;
+    if (status) next.document_status = status;
+  } else if (type === 'kunjungan') {
+    if (date) next.visit_date = date;
+    if (category) next.service_category = category;
+    if (description) next.service_name = description;
+    if (String(patch.doctor || '').trim()) next.doctor_id = String(patch.doctor || '').trim();
+    if (String(patch.poli || '').trim()) next.poli_id = String(patch.poli || '').trim();
+    if (status) next.status = status;
+  }
+  next.updated_at = now;
+  return next;
+}
+
+function getTransactionPeriodFromRow_(type, row) {
+  if (type === 'pendapatan') return toPeriodString_(row.transaction_date);
+  if (type === 'biaya') return toPeriodString_(row.expense_date);
+  if (type === 'pajak') return toPeriodString_(row.tax_period);
+  if (type === 'kunjungan') return toPeriodString_(row.visit_date);
+  return Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM');
 }
 
 function normalizeTransactionListPeriod_(period) {

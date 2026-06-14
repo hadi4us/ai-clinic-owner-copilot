@@ -149,6 +149,17 @@ function testTransactionListPayloadSerializableStatic() {
   return { ok: true };
 }
 
+function testTransactionActionsStatic() {
+  const apiSource = getFunctionSourceText_('doPost') + getFunctionSourceText_('doGet');
+  if (apiSource.indexOf('updateTransaction') === -1) throw new Error('API must expose updateTransaction POST action.');
+  if (apiSource.indexOf('deleteTransaction') === -1) throw new Error('API must expose deleteTransaction POST action.');
+  const updateSource = getFunctionSourceText_('updateTransactionEntryForContext_') + getFunctionSourceText_('deleteTransactionEntryForContext_');
+  if (updateSource.indexOf('isManualTransactionRow_') === -1) throw new Error('Transaction edit/delete must guard imported rows.');
+  if (updateSource.indexOf('computePocKpisNoLock_') === -1) throw new Error('Transaction edit/delete must recompute KPI after mutation.');
+  if (updateSource.indexOf('writeAudit_') === -1) throw new Error('Transaction edit/delete must write audit log.');
+  return { ok: true };
+}
+
 function testKpiPeriodNormalizationStatic() {
   const kpiSource = getFunctionSourceText_('upsertKpiBulanan_') + getFunctionSourceText_('getFinanceSummary') + getFunctionSourceText_('getPreviousMonthlyKpi_');
   if (kpiSource.indexOf('toPeriodString_(row.period) === period') === -1) throw new Error('KPI monthly upsert must normalize spreadsheet serial/date periods before matching.');
@@ -184,6 +195,7 @@ function runAllTests() {
     readiness: testReadinessCheckStatic(),
     transactionListDates: testTransactionListDateNormalization(),
     transactionListPayload: testTransactionListPayloadSerializableStatic(),
+    transactionActions: testTransactionActionsStatic(),
     kpiPeriodNormalization: testKpiPeriodNormalizationStatic(),
     scopedRewriteHelpers: testScopedRewriteHelpersStatic(),
     coaSuggestionClassifier: testCoaSuggestionClassifierStatic(),

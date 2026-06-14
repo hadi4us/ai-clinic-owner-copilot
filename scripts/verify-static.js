@@ -94,6 +94,11 @@ assertIncludes('gas/src/ManualInputService.js', [
   'getAvailableTransactionPeriodsForContext_',
   'availablePeriods',
   "generatedAt: Utilities.formatDate",
+  'updateTransactionEntryForContext_',
+  'deleteTransactionEntryForContext_',
+  'isManualTransactionRow_',
+  'TRANSACTION_IMMUTABLE',
+  'computePocKpisNoLock_',
 ]);
 
 assertNotIncludes('gas/src/ManualInputService.js', [
@@ -103,6 +108,17 @@ assertNotIncludes('gas/src/ManualInputService.js', [
 assertIncludes('gas/src/Dashboard.html', [
   'Payload transaksi kosong dari server',
   'Periode tersedia:',
+  'editTransactionRow',
+  'deleteTransactionRow',
+  'updateDefaultTransactionEntry',
+  'deleteDefaultTransactionEntry',
+]);
+
+assertIncludes('gas/src/Api.js', [
+  'updateTransaction',
+  'deleteTransaction',
+  'updateTransactionEntryForContext_',
+  'deleteTransactionEntryForContext_',
 ]);
 
 assertIncludes('gas/src/COAAssistant.js', [
