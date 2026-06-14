@@ -28,7 +28,16 @@ function toIsoDateString_(value) {
   if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
     return Utilities.formatDate(value, APP_CONFIG.timezone, 'yyyy-MM-dd');
   }
+  if (typeof value === 'number' && isFinite(value) && value > 20000 && value < 80000) {
+    return Utilities.formatDate(new Date(Math.round((value - 25569) * 86400 * 1000)), APP_CONFIG.timezone, 'yyyy-MM-dd');
+  }
   const text = String(value).trim();
+  if (/^\d+(\.\d+)?$/.test(text)) {
+    const serial = Number(text);
+    if (isFinite(serial) && serial > 20000 && serial < 80000) {
+      return Utilities.formatDate(new Date(Math.round((serial - 25569) * 86400 * 1000)), APP_CONFIG.timezone, 'yyyy-MM-dd');
+    }
+  }
   if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
   const dmy = text.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
   if (dmy) return `${dmy[3]}-${String(dmy[2]).padStart(2, '0')}-${String(dmy[1]).padStart(2, '0')}`;

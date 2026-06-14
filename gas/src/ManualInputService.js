@@ -168,5 +168,5 @@ function getTransactionListPayloadForContext_(context, type, period, limit) {
 }
 
 function transactionRowInScope_(row, context, dateValue, period) {
-  return row && row.tenant_id === context.tenantId && row.clinic_id === context.clinicId && String(dateValue || '').slice(0, 7) === String(period || '').slice(0, 7);
+  return row && row.tenant_id === context.tenantId && row.clinic_id === context.clinicId && toPeriodString_(dateValue) === String(period || '').slice(0, 7);
 }

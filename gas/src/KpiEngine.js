@@ -13,9 +13,9 @@ function computePocKpisNoLock_(tenantId, clinicId, period) {
   const procedures = getRowsAsObjects_('TINDAKAN').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.procedure_date, period) && String(r.status || 'active') !== 'cancelled');
   const prescriptions = getRowsAsObjects_('RESEP').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.prescription_date, period) && String(r.status || 'active') !== 'cancelled');
   const expenses = getRowsAsObjects_('BIAYA').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.expense_date, period) && String(r.status || 'paid') !== 'cancel');
-  const bpjsClaims = getRowsAsObjects_('BPJS_KLAIM').filter(r => inScope_(r, tenantId, clinicId) && String(r.claim_period || r.service_month || '').slice(0, 7) === period);
+  const bpjsClaims = getRowsAsObjects_('BPJS_KLAIM').filter(r => inScope_(r, tenantId, clinicId) && toPeriodString_(r.claim_period || r.service_month || r.claim_date) === period);
   const inventory = getRowsAsObjects_('PERSEDIAAN').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.stock_date, period));
-  const taxes = getRowsAsObjects_('PAJAK').filter(r => inScope_(r, tenantId, clinicId) && String(r.tax_period || '').slice(0, 7) === period);
+  const taxes = getRowsAsObjects_('PAJAK').filter(r => inScope_(r, tenantId, clinicId) && toPeriodString_(r.tax_period || r.created_at) === period);
 
   const totalRevenue = sumByField_(revenues, 'net_amount') || (sumByField_(procedures, 'net_amount') + sumByField_(prescriptions, 'net_amount'));
   const procedureRevenue = sumByField_(procedures, 'net_amount') || sumRevenueByType_(revenues, ['tindakan', 'procedure', 'lab', 'admin']);
@@ -75,7 +75,7 @@ function computePhase1Metrics(tenantId, clinicId, period) {
 
 function upsertKpiBulanan_(tenantId, clinicId, period, metrics) {
   replaceObjectsWhere_('KPI_BULANAN', function(row) {
-    return row.tenant_id === tenantId && row.clinic_id === clinicId && row.period === period;
+    return row.tenant_id === tenantId && row.clinic_id === clinicId && toPeriodString_(row.period) === period;
   }, [Object.assign({ tenant_id: tenantId, clinic_id: clinicId, period }, metrics)]);
 }
 
@@ -126,14 +126,14 @@ function computePocDailyKpis_(tenantId, clinicId, period, revenues, prescription
 
 function getFinanceSummary(tenantId, clinicId, period) {
   assertTenantScope_(tenantId, clinicId);
-  return getRowsAsObjects_('KPI_BULANAN').find(r => r.tenant_id === tenantId && r.clinic_id === clinicId && r.period === period) || null;
+  return getRowsAsObjects_('KPI_BULANAN').find(r => r.tenant_id === tenantId && r.clinic_id === clinicId && toPeriodString_(r.period) === period) || null;
 }
 
 function getPreviousMonthlyKpi_(tenantId, clinicId, period) {
   const parts = String(period).split('-');
   const date = new Date(Number(parts[0]), Number(parts[1]) - 2, 1);
   const prevPeriod = Utilities.formatDate(date, APP_CONFIG.timezone, 'yyyy-MM');
-  return getRowsAsObjects_('KPI_BULANAN').find(r => r.tenant_id === tenantId && r.clinic_id === clinicId && r.period === prevPeriod) || null;
+  return getRowsAsObjects_('KPI_BULANAN').find(r => r.tenant_id === tenantId && r.clinic_id === clinicId && toPeriodString_(r.period) === prevPeriod) || null;
 }
 
 function sumRevenueByType_(revenues, types) {
@@ -176,7 +176,7 @@ function getOpenCriticalValidationIssues_(tenantId, clinicId, period, sourceRows
   (sourceRows || []).forEach(row => { if (row.import_id) importIds[row.import_id] = true; });
   if (!Object.keys(importIds).length) {
     getRowsAsObjects_('IMPORT_BATCH')
-      .filter(row => row.tenant_id === tenantId && row.clinic_id === clinicId && String(row.period_start || '').slice(0, 7) === period)
+      .filter(row => row.tenant_id === tenantId && row.clinic_id === clinicId && toPeriodString_(row.period_start || row.started_at) === period)
       .forEach(row => { if (row.import_id) importIds[row.import_id] = true; });
   }
   return getRowsAsObjects_('VALIDATION_LOG').filter(row => row.tenant_id === tenantId && row.clinic_id === clinicId && importIds[row.import_id] && String(row.severity || '').toLowerCase() === 'error' && String(row.resolved || 'false').toLowerCase() !== 'true');

@@ -164,7 +164,7 @@ function getLatestAvailablePeriodForContext_(context) {
 
 function getLatestAvailablePeriodForScope_(tenantId, clinicId) {
   const rows = getRowsAsObjects_('KPI_BULANAN').filter(r => r.tenant_id === tenantId && r.clinic_id === clinicId);
-  if (rows.length) return rows.map(r => String(r.period)).sort().pop();
+  if (rows.length) return rows.map(r => toPeriodString_(r.period)).filter(Boolean).sort().pop();
   const rev = getRowsAsObjects_('PENDAPATAN').filter(r => r.tenant_id === tenantId && r.clinic_id === clinicId);
   if (rev.length) return rev.map(r => toPeriodString_(r.transaction_date)).sort().pop();
   return '';
@@ -175,7 +175,7 @@ function normalizeSummaryForClient_(row) {
   return {
     tenantId: row.tenant_id || row.tenantId,
     clinicId: row.clinic_id || row.clinicId,
-    period: row.period,
+    period: toPeriodString_(row.period),
     totalVisits: Number(row.total_visits || row.totalVisits || 0),
     totalRevenue: Number(row.total_revenue || row.totalRevenue || 0),
     procedureRevenue: Number(row.procedure_revenue || 0),

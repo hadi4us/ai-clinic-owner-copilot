@@ -5,8 +5,8 @@ function getFinancialReportPayload(tenantId, clinicId, period) {
   const revenues = getRowsAsObjects_('PENDAPATAN').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.transaction_date, period) && ['cancel', 'refund'].indexOf(String(r.status || '').toLowerCase()) === -1);
   const expenses = getRowsAsObjects_('BIAYA').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.expense_date, period) && String(r.status || '').toLowerCase() !== 'cancel');
   const prescriptions = getRowsAsObjects_('RESEP').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.prescription_date, period) && String(r.status || 'active').toLowerCase() !== 'cancelled');
-  const taxes = getRowsAsObjects_('PAJAK').filter(r => inScope_(r, tenantId, clinicId) && String(r.tax_period || '').slice(0, 7) === period);
-  const bpjsClaims = getRowsAsObjects_('BPJS_KLAIM').filter(r => inScope_(r, tenantId, clinicId) && String(r.service_month || r.claim_period || '').slice(0, 7) === period);
+  const taxes = getRowsAsObjects_('PAJAK').filter(r => inScope_(r, tenantId, clinicId) && toPeriodString_(r.tax_period || r.created_at) === period);
+  const bpjsClaims = getRowsAsObjects_('BPJS_KLAIM').filter(r => inScope_(r, tenantId, clinicId) && toPeriodString_(r.service_month || r.claim_period || r.claim_date) === period);
   const inventoryRows = getRowsAsObjects_('PERSEDIAAN').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.stock_date, period));
   const coaRows = getRowsAsObjects_('MASTER_COA').filter(r => String(r.tenant_id || '') === tenantId && String(r.status || 'active').toLowerCase() !== 'inactive');
   const totalRevenue = sumByField_(revenues, 'net_amount');

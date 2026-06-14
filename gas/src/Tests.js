@@ -123,6 +123,32 @@ function testReadinessCheckStatic() {
   return { ok: true };
 }
 
+function testTransactionListDateNormalization() {
+  const context = { tenantId: APP_CONFIG.defaultTenantId, clinicId: APP_CONFIG.defaultClinicId };
+  const date = new Date('2026-06-06T00:00:00Z');
+  if (!transactionRowInScope_({ tenant_id: context.tenantId, clinic_id: context.clinicId }, context, date, '2026-06')) {
+    throw new Error('Transaction list must include Date object values from Sheets for matching period.');
+  }
+  if (!transactionRowInScope_({ tenant_id: context.tenantId, clinic_id: context.clinicId }, context, 46187, '2026-06')) {
+    throw new Error('Transaction list must include numeric spreadsheet date serials for matching period.');
+  }
+  if (!transactionRowInScope_({ tenant_id: context.tenantId, clinic_id: context.clinicId }, context, '46187.0', '2026-06')) {
+    throw new Error('Transaction list must include string spreadsheet date serials for matching period.');
+  }
+  if (!transactionRowInScope_({ tenant_id: context.tenantId, clinic_id: context.clinicId }, context, '2026-06-06', '2026-06')) {
+    throw new Error('Transaction list must include ISO date strings for matching period.');
+  }
+  return { ok: true };
+}
+
+function testKpiPeriodNormalizationStatic() {
+  const kpiSource = getFunctionSourceText_('upsertKpiBulanan_') + getFunctionSourceText_('getFinanceSummary') + getFunctionSourceText_('getPreviousMonthlyKpi_');
+  if (kpiSource.indexOf('toPeriodString_(row.period) === period') === -1) throw new Error('KPI monthly upsert must normalize spreadsheet serial/date periods before matching.');
+  if (kpiSource.indexOf('toPeriodString_(r.period) === period') === -1) throw new Error('Finance summary must normalize KPI period before matching.');
+  if (kpiSource.indexOf('toPeriodString_(r.period) === prevPeriod') === -1) throw new Error('Previous monthly KPI lookup must normalize KPI period before matching.');
+  return { ok: true };
+}
+
 
 function testScopedRewriteHelpersStatic() {
   const helperSource = getFunctionSourceText_('replaceObjectsWhere_') + getFunctionSourceText_('updateObjectsWhere_');
@@ -148,6 +174,8 @@ function runAllTests() {
     sensitiveRowGuard: testSensitiveRowsDetectedBeforeRawStorage(),
     dashboardCache: testDashboardCacheStatic(),
     readiness: testReadinessCheckStatic(),
+    transactionListDates: testTransactionListDateNormalization(),
+    kpiPeriodNormalization: testKpiPeriodNormalizationStatic(),
     scopedRewriteHelpers: testScopedRewriteHelpersStatic(),
     unknownUser: testUnknownUserDenied(),
     crossTenant: testCrossTenantDenied(),

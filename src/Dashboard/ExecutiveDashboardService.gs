@@ -69,7 +69,7 @@ function getExecutiveBpjsSummary_(tenantId, clinicId, period) {
   const rows = readExecutiveRowsFromAnySheet_(['BPJS_KLAIM', 'bpjs_claim', 'metric_bpjs_summary'], tenantId, clinicId)
     .filter(function (row) {
       const rowPeriod = row.claim_month || row.period || row.visit_period || '';
-      return !period || String(rowPeriod).slice(0, 7) === String(period).slice(0, 7);
+      return !period || toPeriodString_(rowPeriod) === String(period).slice(0, 7);
     });
   const submitted = sumExecutiveFields_(rows, ['submitted_amount', 'submittedAmount', 'claimed_amount']);
   const approved = sumExecutiveFields_(rows, ['approved_amount', 'approvedAmount']);
@@ -96,7 +96,7 @@ function getExecutiveInventoryRisk_(tenantId, clinicId, period) {
     .filter(function (row) {
       const rowDate = row.prescription_date || row.date || row.period || '';
       if (!period) return true;
-      return String(rowDate).slice(0, 7) === String(period).slice(0, 7);
+      return toPeriodString_(rowDate) === String(period).slice(0, 7);
     });
 
   const gross = sumExecutiveFields_(prescriptionRows, ['gross_amount', 'grossAmount', 'revenue_amount']);
