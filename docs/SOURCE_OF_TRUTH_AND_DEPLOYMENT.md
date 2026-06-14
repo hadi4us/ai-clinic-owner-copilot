@@ -30,7 +30,7 @@ The root `src/` tree is a clean architecture mirror/reference. Do not edit root 
 - Dashboard internal `google.script.run.uploadPocFile` also resolves the same verified session context before import.
 - Unknown users and cross-tenant requests are denied. `Session.getEffectiveUser()` is audit metadata only and is never used as actor fallback.
 - Bootstrap setup is the only token-only mutating action because it may need to create initial `USER_ACCESS` from Script Property `PILOT_OWNER_EMAIL`. After setup, data/dashboard/import/compute/reset require verified session access.
-- Manifest web app access is set to `ANYONE` (Google sign-in required), not `ANYONE_ANONYMOUS`. Keep it non-anonymous for pilot data and set Script Property `PILOT_OWNER_EMAIL` before running setup.
+- Manifest web app access is set to `ANYONE` (Google sign-in required) and `executeAs` is `USER_ACCESSING` so the active Google account can be verified against `USER_ACCESS`. Keep it non-anonymous for pilot data and set Script Property `PILOT_OWNER_EMAIL` before running setup.
 
 ## Hot write-path policy
 

@@ -17,7 +17,7 @@ function assertIncludes(file, snippets) {
 function checkManifest(file) {
   const manifest = JSON.parse(read(file));
   assert(manifest.webapp && manifest.webapp.access === 'ANYONE', `${file} webapp.access must be ANYONE`);
-  assert(manifest.webapp && manifest.webapp.executeAs === 'USER_DEPLOYING', `${file} webapp.executeAs must be USER_DEPLOYING`);
+  assert(manifest.webapp && manifest.webapp.executeAs === 'USER_ACCESSING', `${file} webapp.executeAs must be USER_ACCESSING`);
   assert(!JSON.stringify(manifest.oauthScopes || []).includes('script.external_request'), `${file} must not include script.external_request scope`);
 }
 
