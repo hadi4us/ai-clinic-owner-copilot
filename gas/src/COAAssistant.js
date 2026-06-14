@@ -11,6 +11,11 @@ function suggestCoaForDefaultContext(entry) {
   return suggestCoaForContext_(context, entry || {});
 }
 
+function previewDefaultCoaSuggestion(entry) {
+  const context = resolveRequestContext_({}, {}, 'finance');
+  return suggestCoaForContext_(context, entry || {}, { persist: false });
+}
+
 function suggestCoaForContext_(context, entry, options) {
   assertTenantScope_(context.tenantId, context.clinicId);
   ensurePhase1WarehouseSheetsNoLock_();
