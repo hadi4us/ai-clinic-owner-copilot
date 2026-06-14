@@ -149,6 +149,15 @@ function testTransactionListPayloadSerializableStatic() {
   return { ok: true };
 }
 
+
+function testCoaReviewQueueStatic() {
+  const queueSource = getFunctionSourceText_('getCoaReviewQueueForContext_') + getFunctionSourceText_('approveCoaSuggestionForContext_');
+  if (queueSource.indexOf('pending_review') === -1) throw new Error('COA review queue must list pending_review suggestions.');
+  if (queueSource.indexOf('applyApprovedCoaToSourceTransaction_') === -1) throw new Error('COA approval must apply approved account to source transaction when safe.');
+  if (queueSource.indexOf('writeAudit_') === -1) throw new Error('COA approval must write audit log.');
+  return { ok: true };
+}
+
 function testTransactionActionsStatic() {
   const apiSource = getFunctionSourceText_('doPost') + getFunctionSourceText_('doGet');
   if (apiSource.indexOf('updateTransaction') === -1) throw new Error('API must expose updateTransaction POST action.');
@@ -196,6 +205,7 @@ function runAllTests() {
     transactionListDates: testTransactionListDateNormalization(),
     transactionListPayload: testTransactionListPayloadSerializableStatic(),
     transactionActions: testTransactionActionsStatic(),
+    coaReviewQueue: testCoaReviewQueueStatic(),
     kpiPeriodNormalization: testKpiPeriodNormalizationStatic(),
     scopedRewriteHelpers: testScopedRewriteHelpersStatic(),
     coaSuggestionClassifier: testCoaSuggestionClassifierStatic(),

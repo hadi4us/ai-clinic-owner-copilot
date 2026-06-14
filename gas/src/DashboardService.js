@@ -12,6 +12,7 @@ function getDashboardPayload(tenantId, clinicId, period) {
   const normalizedSummary = normalizeSummaryForClient_(summary);
   const normalizedAlerts = alerts.map(normalizeAlertForClient_);
   const analysis = buildDashboardAiAnalysis_(normalizedSummary, revenueBreakdown, costBreakdown, dataQualityWarnings, normalizedAlerts);
+  const dataQualitySummary = buildDashboardDataQualitySummary_(tenantId, clinicId, period, dataQualityWarnings);
   return {
     appName: APP_CONFIG.appName,
     tenantId,
@@ -23,6 +24,7 @@ function getDashboardPayload(tenantId, clinicId, period) {
     alerts: normalizedAlerts,
     aiAnalysis: analysis,
     dataQualityWarnings: dataQualityWarnings.map(normalizeValidationIssueForClient_),
+    dataQualitySummary,
     trend: daily.map(normalizeDailyTrendForClient_),
     generatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
   };
@@ -190,6 +192,32 @@ function normalizeSummaryForClient_(row) {
     traceStatus: row.trace_status || row.traceStatus || 'unknown',
     financeFinal: isFinalFinanceStatus_(row.data_status || row.dataStatus, row.trace_status || row.traceStatus),
     financeLabel: getFinanceTrustLabel_(row.data_status || row.dataStatus, row.trace_status || row.traceStatus),
+  };
+}
+
+
+function buildDashboardDataQualitySummary_(tenantId, clinicId, period, validationWarnings) {
+  const expenses = getRowsAsObjects_('BIAYA').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.expense_date, period));
+  const revenues = getRowsAsObjects_('PENDAPATAN').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.transaction_date, period));
+  const coaPending = getRowsAsObjects_('AI_COA_SUGGESTION').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.transaction_date, period) && String(r.review_status || '') === 'pending_review');
+  const missingExpenseCoa = expenses.filter(r => !r.account_id).length;
+  const missingExpenseCategory = expenses.filter(r => !r.expense_category).length;
+  const missingRevenueCategory = revenues.filter(r => !r.revenue_type).length;
+  const validationCount = (validationWarnings || []).length;
+  const issues = [];
+  if (coaPending.length) issues.push({ severity: 'medium', label: 'COA perlu review', count: coaPending.length, message: 'Ada rekomendasi AI COA yang belum di-approve owner.' });
+  if (missingExpenseCoa) issues.push({ severity: 'high', label: 'Biaya tanpa COA', count: missingExpenseCoa, message: 'Biaya belum punya akun COA sehingga laporan akuntansi belum final.' });
+  if (missingExpenseCategory) issues.push({ severity: 'medium', label: 'Biaya tanpa kategori', count: missingExpenseCategory, message: 'Kategori biaya kosong mengganggu breakdown biaya.' });
+  if (missingRevenueCategory) issues.push({ severity: 'medium', label: 'Pendapatan tanpa kategori', count: missingRevenueCategory, message: 'Kategori pendapatan kosong mengganggu breakdown omzet.' });
+  if (validationCount) issues.push({ severity: 'high', label: 'Validasi import', count: validationCount, message: 'Ada baris import yang gagal/warning dan belum diselesaikan.' });
+  return {
+    ok: issues.length === 0,
+    pendingCoaReview: coaPending.length,
+    missingExpenseCoa,
+    missingExpenseCategory,
+    missingRevenueCategory,
+    validationIssues: validationCount,
+    issues,
   };
 }
 

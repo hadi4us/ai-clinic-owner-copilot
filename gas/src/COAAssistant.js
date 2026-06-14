@@ -212,6 +212,73 @@ function applyCoaSuggestionToFinalRow_(context, finalRow, targetSheet) {
   return finalRow;
 }
 
+
+function getDefaultCoaReviewQueue(limit) {
+  const context = resolveRequestContext_({}, {}, 'finance');
+  return getCoaReviewQueueForContext_(context, limit || 50);
+}
+
+function getCoaReviewQueueForContext_(context, limit) {
+  assertTenantScope_(context.tenantId, context.clinicId);
+  ensurePhase1WarehouseSheetsNoLock_();
+  const max = Math.max(1, Math.min(Number(limit || 50), 200));
+  const accounts = getActiveCoaAccounts_(context.tenantId).map(row => ({
+    value: row.account_id || row.account_code,
+    label: [row.account_code, row.account_name].filter(Boolean).join(' - '),
+    meta: row.account_type || ''
+  }));
+  const rows = getRowsAsObjects_('AI_COA_SUGGESTION')
+    .filter(row => inScope_(row, context.tenantId, context.clinicId) && String(row.review_status || '') === 'pending_review')
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    .slice(0, max)
+    .map(normalizeCoaReviewSuggestionForClient_);
+  return { ok: true, rows, totalCount: rows.length, accounts, generatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss') };
+}
+
+function normalizeCoaReviewSuggestionForClient_(row) {
+  return {
+    suggestionId: row.suggestion_id || '',
+    sourceType: row.source_type || '',
+    sourceId: row.source_id || '',
+    transactionType: row.transaction_type || '',
+    transactionDate: toIsoDateString_(row.transaction_date) || String(row.transaction_date || ''),
+    description: row.description || '',
+    amount: Number(row.amount || 0),
+    suggestedAccountId: row.suggested_account_id || '',
+    suggestedAccountCode: row.suggested_account_code || '',
+    suggestedAccountName: row.suggested_account_name || '',
+    suggestedCategory: row.suggested_category || '',
+    costType: row.cost_type || '',
+    confidence: Number(row.confidence || 0),
+    rationale: row.rationale || '',
+    reviewStatus: row.review_status || '',
+    createdAt: row.created_at ? Utilities.formatDate(new Date(row.created_at), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss') : '',
+  };
+}
+
+function applyApprovedCoaToSourceTransaction_(context, suggestion, account) {
+  const sourceId = String(suggestion.source_id || '').trim();
+  if (!sourceId) return false;
+  if (String(suggestion.transaction_type || '') !== 'biaya') return false;
+  let applied = false;
+  updateObjectsWhere_('BIAYA', function(row) {
+    return inScope_(row, context.tenantId, context.clinicId) && String(row.expense_id || '') === sourceId;
+  }, function(row) {
+    row.account_id = account.account_id;
+    row.expense_category = row.expense_category || suggestion.suggested_category || 'operasional';
+    row.cost_type = row.cost_type || suggestion.cost_type || inferCostTypeFromAccount_(account);
+    row.updated_at = new Date();
+    applied = true;
+    return row;
+  });
+  return applied;
+}
+
+function approveDefaultCoaSuggestion(suggestionId, approvedAccountId) {
+  const context = resolveRequestContext_({}, {}, 'finance');
+  return approveCoaSuggestionForContext_(context, suggestionId, approvedAccountId);
+}
+
 function approveCoaSuggestionForContext_(context, suggestionId, approvedAccountId) {
   assertTenantScope_(context.tenantId, context.clinicId);
   if (!suggestionId) throw new Error('suggestionId wajib diisi.');
@@ -219,6 +286,7 @@ function approveCoaSuggestionForContext_(context, suggestionId, approvedAccountI
   const account = findCoaAccount_(accounts, approvedAccountId);
   if (!account) throw new Error('Akun COA approval tidak ditemukan atau inactive: ' + approvedAccountId);
   let updated = 0;
+  let sourceApplied = false;
   updateObjectsWhere_('AI_COA_SUGGESTION', function(row) {
     return row.tenant_id === context.tenantId && row.clinic_id === context.clinicId && row.suggestion_id === suggestionId;
   }, function(row) {
@@ -227,10 +295,13 @@ function approveCoaSuggestionForContext_(context, suggestionId, approvedAccountI
     row.approved_account_id = account.account_id;
     row.approved_by = context.userEmail || context.actorId || 'owner';
     row.approved_at = new Date();
+    sourceApplied = applyApprovedCoaToSourceTransaction_(context, row, account);
     return row;
   });
   if (!updated) throw new Error('Saran COA tidak ditemukan: ' + suggestionId);
-  return { ok: true, suggestionId, approvedAccountId: account.account_id, approvedAccountCode: account.account_code, approvedAccountName: account.account_name };
+  invalidateDashboardCache_(context.tenantId, context.clinicId);
+  writeAudit_(context.userEmail || 'owner', 'owner', 'coa_suggestion_approve', 'AI_COA_SUGGESTION', { suggestionId, approvedAccountId: account.account_id, sourceApplied });
+  return { ok: true, suggestionId, approvedAccountId: account.account_id, approvedAccountCode: account.account_code, approvedAccountName: account.account_name, sourceApplied };
 }
 
 function getFallbackCoaRule_(transactionType) {

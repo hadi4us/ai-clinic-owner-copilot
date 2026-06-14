@@ -116,6 +116,8 @@ function importExcelBlob_(blob, importId, tenantId, clinicId, options) {
   let rowsRead = 0;
   let rowsWritten = 0;
   let rowsFailed = 0;
+  let coaSuggestionCount = 0;
+  let coaReviewCount = 0;
 
   const sheets = tempSpreadsheet.getSheets();
   assertImportSheetLimit_(sheets.length);
@@ -131,11 +133,13 @@ function importExcelBlob_(blob, importId, tenantId, clinicId, options) {
     rowsRead += result.rowsRead;
     rowsWritten += result.rowsWritten;
     rowsFailed += result.rowsFailed;
+    coaSuggestionCount += Number(result.coaSuggestionCount || 0);
+    coaReviewCount += Number(result.coaReviewCount || 0);
     imported.push({ sourceSheet: sheet.getName(), targetSheet, rowsWritten: result.rowsWritten, rowsFailed: result.rowsFailed });
   });
 
   try { Drive.Files.trash(tempFile.id); } catch (err) {}
-  return { rowsRead, rowsWritten, rowsFailed, importedSheets: imported };
+  return { rowsRead, rowsWritten, rowsFailed, coaSuggestionCount, coaReviewCount, importedSheets: imported };
 }
 
 function tableValuesToObjects_(values) {
@@ -206,7 +210,7 @@ function importObjectRowsToFinalSheet_(targetSheet, sourceRows, importId, tenant
   appendObjects_('RAW_IMPORT', rawRows);
   appendObjects_(targetSheet, finalRows);
   appendObjects_('AI_COA_SUGGESTION', coaSuggestionRows);
-  return { rowsRead: rows.length, rowsWritten: finalRows.length, rowsFailed, importedSheets: [{ targetSheet, rowsWritten: finalRows.length, rowsFailed }] };
+  return { rowsRead: rows.length, rowsWritten: finalRows.length, rowsFailed, coaSuggestionCount: coaSuggestionRows.length, coaReviewCount: coaSuggestionRows.filter(function(row) { return String(row.review_status || '') === 'pending_review'; }).length, importedSheets: [{ targetSheet, rowsWritten: finalRows.length, rowsFailed, coaSuggestionCount: coaSuggestionRows.length, coaReviewCount: coaSuggestionRows.filter(function(row) { return String(row.review_status || '') === 'pending_review'; }).length }] };
 }
 
 function mapGenericRowToFinalSheet_(targetSheet, row, importId, tenantId, clinicId, sourceRowId, index) {

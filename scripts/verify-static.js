@@ -108,6 +108,10 @@ assertNotIncludes('gas/src/ManualInputService.js', [
 assertIncludes('gas/src/Dashboard.html', [
   'Payload transaksi kosong dari server',
   'Periode tersedia:',
+  'view-coa-review',
+  'loadCoaReviewQueue',
+  'renderCoaReviewQueue',
+  'renderUploadSummary',
   'editTransactionRow',
   'openTransactionEditModal',
   'transactionEditModal',
@@ -115,6 +119,26 @@ assertIncludes('gas/src/Dashboard.html', [
   'deleteTransactionRow',
   'updateDefaultTransactionEntry',
   'deleteDefaultTransactionEntry',
+]);
+
+assertIncludes('gas/src/COAAssistant.js', [
+  'getDefaultCoaReviewQueue',
+  'getCoaReviewQueueForContext_',
+  'pending_review',
+  'approveDefaultCoaSuggestion',
+  'applyApprovedCoaToSourceTransaction_',
+]);
+
+assertIncludes('gas/src/DashboardService.js', [
+  'dataQualitySummary',
+  'buildDashboardDataQualitySummary_',
+  'pendingCoaReview',
+  'missingExpenseCoa',
+]);
+
+assertIncludes('gas/src/ImportService.js', [
+  'coaSuggestionCount',
+  'coaReviewCount',
 ]);
 
 assertIncludes('gas/src/Api.js', [
