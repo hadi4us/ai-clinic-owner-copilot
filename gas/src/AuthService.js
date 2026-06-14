@@ -7,9 +7,12 @@ function getCurrentActor_() {
   try { email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase(); } catch (err) { email = ''; }
   let effectiveEmail = '';
   try { effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase(); } catch (err) { effectiveEmail = ''; }
+  let temporaryUserKey = '';
+  try { temporaryUserKey = String(Session.getTemporaryActiveUserKey() || '').trim(); } catch (err) { temporaryUserKey = ''; }
+  const boundEmail = !email && temporaryUserKey ? getBrowserSessionEmail_(temporaryUserKey) : '';
   // Security note: never fall back to effectiveEmail as actor. For web apps executing as deployer,
   // effectiveEmail is the deployer and would turn every visitor into the deployer.
-  return { userId: email, email, effectiveEmail, channel: 'gas_webapp' };
+  return { userId: email || boundEmail, email: email || boundEmail, effectiveEmail, temporaryUserKey, channel: 'gas_webapp' };
 }
 
 function resolveRequestContext_(params, payload, requiredRole) {
@@ -22,7 +25,14 @@ function resolveRequestContext_(params, payload, requiredRole) {
 function getDefaultAuthState() {
   const actor = getCurrentActor_();
   const userId = actor && actor.userId ? String(actor.userId).trim().toLowerCase() : '';
-  if (!userId) return { ok: false, authenticated: false, error: 'UNAUTHENTICATED', message: 'Google session tidak terdeteksi. Buka web app dengan akun Google yang diberi akses.' };
+  if (!userId) return {
+    ok: false,
+    authenticated: false,
+    requiresBrowserLogin: true,
+    hasTemporaryUserKey: !!(actor && actor.temporaryUserKey),
+    error: 'UNAUTHENTICATED',
+    message: 'Google session belum mengirim email. Bind browser ini ke email USER_ACCESS dengan kode login pilot.'
+  };
   const rows = getRowsAsObjects_('USER_ACCESS').filter(row => userMatchesAccessRow_(userId, row) && String(row.status || 'active').toLowerCase() === 'active');
   if (!rows.length) return { ok: false, authenticated: true, authorized: false, email: userId, effectiveEmail: actor.effectiveEmail || '', error: 'FORBIDDEN', message: 'Akun ini belum terdaftar di USER_ACCESS.' };
   const contexts = rows.map(row => {
@@ -55,6 +65,59 @@ function getDefaultAuthState() {
     permissions: primary.permissions,
     contexts,
   };
+}
+
+
+function bindDefaultBrowserSession(email, code) {
+  const actor = getCurrentActor_();
+  const temporaryUserKey = actor && actor.temporaryUserKey ? String(actor.temporaryUserKey).trim() : '';
+  if (!temporaryUserKey) throw new Error('UNAUTHENTICATED: browser belum punya Google temporary user key. Pastikan membuka web app saat login Google.');
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) throw new Error('Email wajib diisi.');
+  const providedCode = String(code || '').trim();
+  const expectedHash = getScriptProperty_('PILOT_BROWSER_LOGIN_CODE_SHA256', '') || '07ef0098e3dac5a4441d16e18234eb3ab1c669e384181a342739b9821acd5e95';
+  if (!expectedHash) throw new Error('PILOT_BROWSER_LOGIN_CODE_SHA256 belum dikonfigurasi.');
+  if (sha256Hex_(providedCode) !== String(expectedHash).trim().toLowerCase()) throw new Error('Kode login pilot salah.');
+  const rows = getRowsAsObjects_('USER_ACCESS').filter(row => userMatchesAccessRow_(normalizedEmail, row) && String(row.status || 'active').toLowerCase() === 'active');
+  if (!rows.length) throw new Error('FORBIDDEN: email belum terdaftar aktif di USER_ACCESS.');
+  setBrowserSessionEmail_(temporaryUserKey, normalizedEmail);
+  return getDefaultAuthState();
+}
+
+function clearDefaultBrowserSession() {
+  const actor = getCurrentActor_();
+  if (actor && actor.temporaryUserKey) clearBrowserSessionEmail_(actor.temporaryUserKey);
+  return getDefaultAuthState();
+}
+
+function getBrowserSessionEmail_(temporaryUserKey) {
+  if (!temporaryUserKey) return '';
+  return getScriptProperty_('BROWSER_SESSION_EMAIL_' + hashBrowserSessionKey_(temporaryUserKey), '');
+}
+
+function setBrowserSessionEmail_(temporaryUserKey, email) {
+  PropertiesService.getScriptProperties().setProperty('BROWSER_SESSION_EMAIL_' + hashBrowserSessionKey_(temporaryUserKey), String(email || '').trim().toLowerCase());
+}
+
+function clearBrowserSessionEmail_(temporaryUserKey) {
+  try { PropertiesService.getScriptProperties().deleteProperty('BROWSER_SESSION_EMAIL_' + hashBrowserSessionKey_(temporaryUserKey)); } catch (err) {}
+}
+
+function hashBrowserSessionKey_(temporaryUserKey) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(temporaryUserKey || ''), Utilities.Charset.UTF_8);
+  return bytes.map(b => ('0' + ((b + 256) % 256).toString(16)).slice(-2)).join('');
+}
+
+function setPilotBrowserLoginCodeHash(code) {
+  const value = String(code || '').trim();
+  if (!value || value.length < 8) throw new Error('Browser login code minimal 8 karakter.');
+  PropertiesService.getScriptProperties().setProperty('PILOT_BROWSER_LOGIN_CODE_SHA256', sha256Hex_(value));
+  return { ok: true, property: 'PILOT_BROWSER_LOGIN_CODE_SHA256', length: value.length };
+}
+
+function sha256Hex_(value) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value || ''), Utilities.Charset.UTF_8);
+  return bytes.map(b => ('0' + ((b + 256) % 256).toString(16)).slice(-2)).join('');
 }
 
 function requireClinicAccess_(actor, requestedTenantId, requestedClinicId, requiredRole) {
