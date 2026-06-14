@@ -15,6 +15,8 @@ const SHEET_SCHEMAS = Object.freeze({
   IMPORT_BATCH: ['tenant_id', 'clinic_id', 'import_id', 'source_system', 'import_method', 'period_start', 'period_end', 'status', 'data_status', 'started_at', 'completed_at', 'created_by', 'notes'],
   IMPORT_FILE: ['tenant_id', 'clinic_id', 'import_id', 'file_id', 'file_name', 'file_type', 'source_report_name', 'checksum', 'row_count', 'uploaded_at', 'uploaded_by', 'status'],
   MAPPING_SUMBER: ['mapping_id', 'tenant_id', 'clinic_id', 'source_system', 'source_report_name', 'source_sheet_name', 'source_column', 'target_sheet', 'target_column', 'transform_rule', 'required', 'default_value', 'status', 'created_at', 'updated_at'],
+  COA_MAPPING_RULE: ['tenant_id', 'clinic_id', 'rule_id', 'transaction_type', 'match_text', 'suggested_account_id', 'suggested_category', 'cost_type', 'confidence', 'priority', 'status', 'created_at', 'updated_at'],
+  AI_COA_SUGGESTION: ['tenant_id', 'clinic_id', 'suggestion_id', 'source_type', 'source_id', 'transaction_type', 'transaction_date', 'description', 'amount', 'suggested_account_id', 'suggested_account_code', 'suggested_account_name', 'suggested_category', 'cost_type', 'confidence', 'rationale', 'review_status', 'approved_account_id', 'approved_by', 'approved_at', 'created_at'],
   VALIDATION_LOG: ['validation_id', 'tenant_id', 'clinic_id', 'import_id', 'file_id', 'target_sheet', 'row_number', 'column_name', 'severity', 'issue_type', 'message', 'source_value', 'normalized_value', 'resolved', 'created_at'],
   RAW_IMPORT: ['tenant_id', 'clinic_id', 'import_id', 'file_id', 'raw_id', 'source_system', 'source_report_name', 'source_sheet_name', 'source_row_id', 'raw_payload', 'payload_hash', 'imported_at'],
 

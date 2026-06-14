@@ -119,3 +119,20 @@ The app seeds a default clinic-friendly COA into `MASTER_COA` during setup. It i
 - Back-office payroll, rent, utilities, software, marketing, and admin expenses stay in 6000 operating expenses.
 - Tax payable accounts in 2300 are liabilities; tax expense can use 6710 for management reporting.
 - If source data cannot distinguish direct cost from operating expense, mark `data_status` as `estimated` or `incomplete` and surface a data-quality warning.
+
+## MVP COA Copilot (Rule-Based, AI-Ready)
+
+Mulai sprint COA assistant, pilot menggunakan pendekatan aman: sistem memberi saran akun COA berbasis rule/keyword terlebih dahulu, lalu menyimpan jejak review di sheet `AI_COA_SUGGESTION`. Belum ada external LLM call di MVP ini supaya tidak menambah secret, biaya, atau risiko posting otomatis.
+
+Sheet tambahan:
+
+- `COA_MAPPING_RULE` — rule tenant/klinik untuk keyword → akun COA, kategori, cost type, confidence, dan prioritas.
+- `AI_COA_SUGGESTION` — audit trail saran COA dari manual input/import: sumber transaksi, teks asli, akun yang disarankan, confidence, rationale, status review, approver, timestamp.
+
+Prinsip operasional:
+
+1. **No double entry** — AI tidak membuat transaksi baru di luar import/manual row yang memang dibuat user.
+2. **Assist, not autopost** — confidence rendah masuk `pending_review`; angka tidak dipaksa ke akun final.
+3. **Traceable** — setiap saran menyimpan `source_type`, `source_id`, `description`, `suggested_account_*`, `confidence`, dan `review_status`.
+4. **Safe fallback** — transaksi tidak dikenal diarahkan ke akun lain-lain (`coa_opex_other` / `coa_revenue_other`) dengan status review, bukan dianggap final diam-diam.
+5. **AI-ready** — kalau nanti LLM ditambahkan, output-nya harus masuk format suggestion yang sama dan tetap melewati approval/trace gate.

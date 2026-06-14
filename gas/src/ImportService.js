@@ -153,6 +153,8 @@ function importObjectRowsToFinalSheet_(targetSheet, sourceRows, importId, tenant
   let rowsFailed = 0;
   const rawRows = [];
   const finalRows = [];
+  const coaSuggestionRows = [];
+  const coaContext = { tenantId, clinicId };
   const seenPayloadHashes = {};
   rows.forEach((sourceRow, index) => {
     const sourceRowId = `${sourceSheetName || targetSheet}_${index + 1}`;
@@ -184,18 +186,26 @@ function importObjectRowsToFinalSheet_(targetSheet, sourceRows, importId, tenant
       imported_at: new Date(),
     });
 
-    const mapped = mapGenericRowToFinalSheet_(targetSheet, sourceRow, importId, tenantId, clinicId, sourceRowId, index);
+    const mapped = applyCoaSuggestionToFinalRow_(coaContext, mapGenericRowToFinalSheet_(targetSheet, sourceRow, importId, tenantId, clinicId, sourceRowId, index), targetSheet);
     const validation = validateFinalRow_(targetSheet, mapped, index + 2);
     if (!validation.ok) {
       rowsFailed++;
       validation.errors.forEach(err => appendValidationLog_(tenantId, clinicId, importId, targetSheet, err.rowNumber, err.columnName, 'error', err.issueType, err.message, err.sourceValue, err.normalizedValue));
       return;
     }
+    if (mapped._coaSuggestionAudit) {
+      coaSuggestionRows.push(mapped._coaSuggestionAudit);
+      delete mapped._coaSuggestionAudit;
+    } else {
+      const auditRow = buildImportedCoaSuggestionRow_(coaContext, mapped, targetSheet);
+      if (auditRow) coaSuggestionRows.push(auditRow);
+    }
     finalRows.push(mapped);
   });
 
   appendObjects_('RAW_IMPORT', rawRows);
   appendObjects_(targetSheet, finalRows);
+  appendObjects_('AI_COA_SUGGESTION', coaSuggestionRows);
   return { rowsRead: rows.length, rowsWritten: finalRows.length, rowsFailed, importedSheets: [{ targetSheet, rowsWritten: finalRows.length, rowsFailed }] };
 }
 

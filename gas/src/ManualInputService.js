@@ -25,6 +25,10 @@ function saveManualClinicEntryForContext_(context, entry) {
     }]);
     let sheetName = '';
     let row = null;
+    let coaSuggestion = null;
+    if ((type === 'pendapatan' || type === 'biaya') && !entry.accountId) {
+      coaSuggestion = buildCoaSuggestion_(context, normalizeCoaCandidateInput_(Object.assign({}, entry, { type: type, transactionDate: date || period + '-01' })));
+    }
     if (type === 'pendapatan') {
       sheetName = 'PENDAPATAN';
       row = {
@@ -39,7 +43,7 @@ function saveManualClinicEntryForContext_(context, entry) {
       sheetName = 'BIAYA';
       row = {
         tenant_id: context.tenantId, clinic_id: context.clinicId, expense_id: 'exp_' + importId, import_id: importId, source_row_id: 'manual_1',
-        expense_date: date || period + '-01', expense_category: entry.category || 'operasional', expense_name: entry.description || 'Biaya manual', account_id: entry.accountId || '',
+        expense_date: date || period + '-01', expense_category: entry.category || (coaSuggestion && coaSuggestion.suggestedCategory) || 'operasional', expense_name: entry.description || 'Biaya manual', account_id: entry.accountId || (coaSuggestion && !coaSuggestion.needsReview ? coaSuggestion.suggestedAccountId : ''),
         amount: asNumber_(entry.amount, 0), payment_method: entry.paymentMethod || '', vendor_name: entry.vendor || '', related_visit_id: '', related_item_code: '',
         cost_type: entry.costType || 'operational', allocation_target: 'clinic', allocation_id: context.clinicId, status: 'paid', trace_status: 'manual_trace', created_at: now,
       };
@@ -66,9 +70,10 @@ function saveManualClinicEntryForContext_(context, entry) {
       throw new Error('Jenis input tidak dikenal: ' + type);
     }
     appendObjects_(sheetName, [row]);
+    if (coaSuggestion) saveCoaSuggestion_(context, normalizeCoaCandidateInput_(Object.assign({}, entry, { type: type, sourceId: row.revenue_id || row.expense_id || importId, transactionDate: date || period + '-01' })), coaSuggestion, 'manual_input');
     const computeResult = computePocKpisNoLock_(context.tenantId, context.clinicId, period);
     writeAudit_(context.userEmail || 'owner', 'owner', 'manual_input_' + type, sheetName, { importId, period, targetId: row.revenue_id || row.expense_id || row.tax_id || row.visit_id });
-    return { ok: true, type, sheetName, importId, period, rowWritten: 1, compute: computeResult };
+    return { ok: true, type, sheetName, importId, period, rowWritten: 1, coaSuggestion, compute: computeResult };
   });
 }
 

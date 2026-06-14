@@ -22,7 +22,7 @@ function doGet(e) {
     const context = resolveRequestContext_(params, {}, 'finance');
     return jsonOutput_(getTransactionListPayloadForContext_(context, params.type || 'all', params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'), params.limit || 100));
   }
-  if (['setup', 'compute', 'resetFixture', 'upload', 'manualInput'].indexOf(action) !== -1) {
+  if (['setup', 'compute', 'resetFixture', 'upload', 'manualInput', 'suggestCoa', 'approveCoaSuggestion'].indexOf(action) !== -1) {
     return jsonOutput_({ ok: false, error: 'MUTATING_GET_DISABLED', message: 'Action mutasi hanya tersedia via POST dengan token pilot.' });
   }
 
@@ -55,6 +55,16 @@ function doPost(e) {
     assertPilotMutationAllowed_(params, payload);
     const context = resolveRequestContext_(params, payload, 'finance');
     return jsonOutput_(saveManualClinicEntryForContext_(context, payload.entry || payload));
+  }
+  if (action === 'suggestCoa') {
+    assertPilotMutationAllowed_(params, payload);
+    const context = resolveRequestContext_(params, payload, 'finance');
+    return jsonOutput_(suggestCoaForContext_(context, payload.entry || payload));
+  }
+  if (action === 'approveCoaSuggestion') {
+    assertPilotMutationAllowed_(params, payload);
+    const context = resolveRequestContext_(params, payload, 'finance');
+    return jsonOutput_(approveCoaSuggestionForContext_(context, payload.suggestionId || params.suggestionId, payload.approvedAccountId || params.approvedAccountId));
   }
   if (action === 'resetFixture') {
     assertPilotMutationAllowed_(params, payload);

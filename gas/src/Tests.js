@@ -177,6 +177,7 @@ function runAllTests() {
     transactionListDates: testTransactionListDateNormalization(),
     kpiPeriodNormalization: testKpiPeriodNormalizationStatic(),
     scopedRewriteHelpers: testScopedRewriteHelpersStatic(),
+    coaSuggestionClassifier: testCoaSuggestionClassifierStatic(),
     unknownUser: testUnknownUserDenied(),
     crossTenant: testCrossTenantDenied(),
   };

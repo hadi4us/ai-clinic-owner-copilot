@@ -82,6 +82,21 @@ assertIncludes('gas/src/DashboardService.js', [
   'dataQualityWarnings',
 ]);
 
+
+assertIncludes('gas/src/COAAssistant.js', [
+  'COA_REVIEW_THRESHOLD',
+  'suggestCoaForContext_',
+  'buildCoaSuggestion_',
+  'AI_COA_SUGGESTION',
+  'getDefaultCoaMappingRules_',
+  'testCoaSuggestionClassifierStatic',
+]);
+
+assertIncludes('gas/src/Schema.js', [
+  'COA_MAPPING_RULE',
+  'AI_COA_SUGGESTION',
+]);
+
 assertIncludes('gas/src/ReadinessService.js', [
   'readinessCheck',
   'mutation_token_configured',
