@@ -141,6 +141,14 @@ function testTransactionListDateNormalization() {
   return { ok: true };
 }
 
+function testTransactionListPayloadSerializableStatic() {
+  const source = getFunctionSourceText_('getTransactionListPayloadForContext_');
+  if (source.indexOf('generatedAt: new Date()') !== -1) throw new Error('Transaction list payload must not return raw Date objects to google.script.run.');
+  if (source.indexOf('availablePeriods') === -1) throw new Error('Transaction list payload should expose available periods for empty filters.');
+  if (getFunctionSourceText_('normalizeTransactionListPeriod_').indexOf('toPeriodString_') === -1) throw new Error('Transaction list period must be normalized.');
+  return { ok: true };
+}
+
 function testKpiPeriodNormalizationStatic() {
   const kpiSource = getFunctionSourceText_('upsertKpiBulanan_') + getFunctionSourceText_('getFinanceSummary') + getFunctionSourceText_('getPreviousMonthlyKpi_');
   if (kpiSource.indexOf('toPeriodString_(row.period) === period') === -1) throw new Error('KPI monthly upsert must normalize spreadsheet serial/date periods before matching.');
@@ -175,6 +183,7 @@ function runAllTests() {
     dashboardCache: testDashboardCacheStatic(),
     readiness: testReadinessCheckStatic(),
     transactionListDates: testTransactionListDateNormalization(),
+    transactionListPayload: testTransactionListPayloadSerializableStatic(),
     kpiPeriodNormalization: testKpiPeriodNormalizationStatic(),
     scopedRewriteHelpers: testScopedRewriteHelpersStatic(),
     coaSuggestionClassifier: testCoaSuggestionClassifierStatic(),

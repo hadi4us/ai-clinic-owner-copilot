@@ -14,6 +14,12 @@ function assertIncludes(file, snippets) {
   return text;
 }
 
+function assertNotIncludes(file, snippets) {
+  const text = read(file);
+  for (const snippet of snippets) assert(!text.includes(snippet), `${file} must not include ${snippet}`);
+  return text;
+}
+
 function checkManifest(file) {
   const manifest = JSON.parse(read(file));
   assert(manifest.webapp && manifest.webapp.access === 'ANYONE', `${file} webapp.access must be ANYONE`);
@@ -82,6 +88,22 @@ assertIncludes('gas/src/DashboardService.js', [
   'dataQualityWarnings',
 ]);
 
+
+assertIncludes('gas/src/ManualInputService.js', [
+  'normalizeTransactionListPeriod_',
+  'getAvailableTransactionPeriodsForContext_',
+  'availablePeriods',
+  "generatedAt: Utilities.formatDate",
+]);
+
+assertNotIncludes('gas/src/ManualInputService.js', [
+  'generatedAt: new Date()',
+]);
+
+assertIncludes('gas/src/Dashboard.html', [
+  'Payload transaksi kosong dari server',
+  'Periode tersedia:',
+]);
 
 assertIncludes('gas/src/COAAssistant.js', [
   'COA_REVIEW_THRESHOLD',

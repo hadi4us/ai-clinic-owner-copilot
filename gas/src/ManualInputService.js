@@ -134,13 +134,14 @@ function getDefaultManualInputOptions() {
 
 function getDefaultTransactionListPayload(type, period, limit) {
   const context = resolveRequestContext_({}, {}, 'finance');
-  return getTransactionListPayloadForContext_(context, type || 'all', period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'), limit || 100);
+  const resolvedPeriod = normalizeTransactionListPeriod_(period || getLatestAvailablePeriodForTransactions_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'));
+  return getTransactionListPayloadForContext_(context, type || 'all', resolvedPeriod, limit || 100);
 }
 
 function getTransactionListPayloadForContext_(context, type, period, limit) {
   assertTenantScope_(context.tenantId, context.clinicId);
   const normalizedType = normalizeHeaderKey_(type || 'all');
-  const normalizedPeriod = String(period || '').slice(0, 7) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM');
+  const normalizedPeriod = normalizeTransactionListPeriod_(period || getLatestAvailablePeriodForTransactions_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'));
   const maxRows = Math.max(1, Math.min(Number(limit || 100), 300));
   const rows = [];
   const include = name => normalizedType === 'all' || normalizedType === name;
@@ -169,7 +170,38 @@ function getTransactionListPayloadForContext_(context, type, period, limit) {
     }));
   }
   rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id || '').localeCompare(String(a.id || '')));
-  return { ok: true, tenantId: context.tenantId, clinicId: context.clinicId, period: normalizedPeriod, type: normalizedType, count: Math.min(rows.length, maxRows), totalCount: rows.length, rows: rows.slice(0, maxRows), generatedAt: new Date() };
+  return {
+    ok: true,
+    tenantId: context.tenantId,
+    clinicId: context.clinicId,
+    period: normalizedPeriod,
+    type: normalizedType,
+    count: Math.min(rows.length, maxRows),
+    totalCount: rows.length,
+    rows: rows.slice(0, maxRows),
+    availablePeriods: getAvailableTransactionPeriodsForContext_(context).slice(-18),
+    generatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
+  };
+}
+
+function normalizeTransactionListPeriod_(period) {
+  const text = String(period || '').trim();
+  if (/^\d{4}-\d{2}$/.test(text)) return text;
+  return toPeriodString_(text) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM');
+}
+
+function getLatestAvailablePeriodForTransactions_(context) {
+  const periods = getAvailableTransactionPeriodsForContext_(context);
+  return periods.length ? periods[periods.length - 1] : '';
+}
+
+function getAvailableTransactionPeriodsForContext_(context) {
+  const values = [];
+  getRowsAsObjects_('PENDAPATAN').filter(row => inScope_(row, context.tenantId, context.clinicId)).forEach(row => values.push(toPeriodString_(row.transaction_date)));
+  getRowsAsObjects_('BIAYA').filter(row => inScope_(row, context.tenantId, context.clinicId)).forEach(row => values.push(toPeriodString_(row.expense_date)));
+  getRowsAsObjects_('PAJAK').filter(row => inScope_(row, context.tenantId, context.clinicId)).forEach(row => values.push(toPeriodString_(row.tax_period)));
+  getRowsAsObjects_('KUNJUNGAN').filter(row => inScope_(row, context.tenantId, context.clinicId)).forEach(row => values.push(toPeriodString_(row.visit_date)));
+  return Array.from(new Set(values.filter(Boolean))).sort();
 }
 
 function transactionRowInScope_(row, context, dateValue, period) {
