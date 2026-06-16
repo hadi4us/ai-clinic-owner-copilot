@@ -65,9 +65,9 @@ function getGrowthAssistantPayload(tenantId, clinicId, period) {
 
 function buildGrowthPatientProfiles_(tenantId, clinicId, period) {
   const patients = {};
-  const patientRefs = getRowsAsObjects_('PASIEN_REF').filter(row => inScope_(row, tenantId, clinicId));
-  const visits = getRowsAsObjects_('KUNJUNGAN').filter(row => inScope_(row, tenantId, clinicId));
-  const revenues = getRowsAsObjects_('PENDAPATAN').filter(row => inScope_(row, tenantId, clinicId));
+  const patientRefs = getScopedRows_('PASIEN_REF', tenantId, clinicId);
+  const visits = getScopedRows_('KUNJUNGAN', tenantId, clinicId);
+  const revenues = getScopedRows_('PENDAPATAN', tenantId, clinicId);
   const visitPatientMap = {};
 
   patientRefs.forEach(row => {

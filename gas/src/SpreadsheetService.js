@@ -1,5 +1,6 @@
 var WAREHOUSE_SPREADSHEET_CACHE_ = null;
 var SHEET_ROWS_CACHE_ = {};
+var SHEET_SCOPE_ROWS_CACHE_ = {};
 
 function getWarehouseSpreadsheet_() {
   if (!WAREHOUSE_SPREADSHEET_CACHE_) {
@@ -104,6 +105,27 @@ function getRowsAsObjects_(sheetName) {
   return cloneRowsForRead_(rows);
 }
 
+function getScopedRows_(sheetName, tenantId, clinicId) {
+  const key = [sheetName, tenantId || '', clinicId || ''].join('|');
+  if (SHEET_SCOPE_ROWS_CACHE_[key]) return cloneRowsForRead_(SHEET_SCOPE_ROWS_CACHE_[key]);
+  const rows = getRowsAsObjects_(sheetName).filter(row => inScope_(row, tenantId, clinicId));
+  SHEET_SCOPE_ROWS_CACHE_[key] = rows;
+  return cloneRowsForRead_(rows);
+}
+
+function getScopedPeriodRows_(sheetName, tenantId, clinicId, dateFields, period) {
+  const fields = Array.isArray(dateFields) ? dateFields : [dateFields];
+  const normalizedPeriod = String(period || '').slice(0, 7);
+  if (!normalizedPeriod) return getScopedRows_(sheetName, tenantId, clinicId);
+  const key = [sheetName, tenantId || '', clinicId || '', fields.join(','), normalizedPeriod].join('|');
+  if (SHEET_SCOPE_ROWS_CACHE_[key]) return cloneRowsForRead_(SHEET_SCOPE_ROWS_CACHE_[key]);
+  const rows = getScopedRows_(sheetName, tenantId, clinicId).filter(function(row) {
+    return fields.some(function(field) { return toPeriodString_(row[field]) === normalizedPeriod; });
+  });
+  SHEET_SCOPE_ROWS_CACHE_[key] = rows;
+  return cloneRowsForRead_(rows);
+}
+
 function cloneRowsForRead_(rows) {
   return (rows || []).map(row => Object.assign({}, row));
 }
@@ -111,9 +133,13 @@ function cloneRowsForRead_(rows) {
 function invalidateSheetRowsCache_(sheetName) {
   if (!sheetName) {
     SHEET_ROWS_CACHE_ = {};
+    SHEET_SCOPE_ROWS_CACHE_ = {};
     return;
   }
   delete SHEET_ROWS_CACHE_[sheetName];
+  Object.keys(SHEET_SCOPE_ROWS_CACHE_).forEach(function(key) {
+    if (key.indexOf(sheetName + '|') === 0) delete SHEET_SCOPE_ROWS_CACHE_[key];
+  });
 }
 
 function ensurePhase1WarehouseSheetsNoLock_() {

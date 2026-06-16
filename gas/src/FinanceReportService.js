@@ -2,12 +2,12 @@ function getFinancialReportPayload(tenantId, clinicId, period) {
   assertTenantScope_(tenantId, clinicId);
   period = normalizeReportPeriod_(period);
   ensurePhase1WarehouseSheetsNoLock_();
-  const revenues = getRowsAsObjects_('PENDAPATAN').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.transaction_date, period) && ['cancel', 'refund'].indexOf(String(r.status || '').toLowerCase()) === -1);
-  const expenses = getRowsAsObjects_('BIAYA').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.expense_date, period) && String(r.status || '').toLowerCase() !== 'cancel');
-  const prescriptions = getRowsAsObjects_('RESEP').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.prescription_date, period) && String(r.status || 'active').toLowerCase() !== 'cancelled');
-  const taxes = getRowsAsObjects_('PAJAK').filter(r => inScope_(r, tenantId, clinicId) && toPeriodString_(r.tax_period || r.created_at) === period);
-  const bpjsClaims = getRowsAsObjects_('BPJS_KLAIM').filter(r => inScope_(r, tenantId, clinicId) && toPeriodString_(r.service_month || r.claim_period || r.claim_date) === period);
-  const inventoryRows = getRowsAsObjects_('PERSEDIAAN').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.stock_date, period));
+  const revenues = getScopedPeriodRows_('PENDAPATAN', tenantId, clinicId, 'transaction_date', period).filter(r => ['cancel', 'refund'].indexOf(String(r.status || '').toLowerCase()) === -1);
+  const expenses = getScopedPeriodRows_('BIAYA', tenantId, clinicId, 'expense_date', period).filter(r => String(r.status || '').toLowerCase() !== 'cancel');
+  const prescriptions = getScopedPeriodRows_('RESEP', tenantId, clinicId, 'prescription_date', period).filter(r => String(r.status || 'active').toLowerCase() !== 'cancelled');
+  const taxes = getScopedPeriodRows_('PAJAK', tenantId, clinicId, ['tax_period', 'created_at'], period);
+  const bpjsClaims = getScopedPeriodRows_('BPJS_KLAIM', tenantId, clinicId, ['service_month', 'claim_period', 'claim_date'], period);
+  const inventoryRows = getScopedPeriodRows_('PERSEDIAAN', tenantId, clinicId, 'stock_date', period);
   const coaRows = getRowsAsObjects_('MASTER_COA').filter(r => String(r.tenant_id || '') === tenantId && String(r.status || 'active').toLowerCase() !== 'inactive');
   const totalRevenue = sumByField_(revenues, 'net_amount');
   const receivable = sumByField_(revenues, 'receivable_amount');
@@ -156,7 +156,50 @@ function coaSummaryNote_(byType, type) {
 function getDefaultFinancialReportPayload(period) {
   const context = resolveRequestContext_({}, {}, 'finance');
   const resolvedPeriod = normalizeReportPeriod_(period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'));
-  return getFinancialReportPayload(context.tenantId, context.clinicId, resolvedPeriod);
+  const cached = getFinancialReportPayloadFromCache_(context.tenantId, context.clinicId, resolvedPeriod);
+  if (cached) return cached;
+  const payload = getFinancialReportPayload(context.tenantId, context.clinicId, resolvedPeriod);
+  putFinancialReportPayloadCache_(context.tenantId, context.clinicId, resolvedPeriod, payload);
+  return payload;
+}
+
+function getFinancialReportPayloadCacheKey_(tenantId, clinicId, period) {
+  return ['financial_report_payload_v1', tenantId, clinicId, period || 'latest'].join(':');
+}
+
+function getFinancialReportPayloadFromCache_(tenantId, clinicId, period) {
+  try {
+    const raw = CacheService.getScriptCache().get(getFinancialReportPayloadCacheKey_(tenantId, clinicId, period));
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    payload.cache = { hit: true, ttlSeconds: APP_CONFIG.dashboardCacheTtlSeconds || 120 };
+    return payload;
+  } catch (err) {
+    return null;
+  }
+}
+
+function putFinancialReportPayloadCache_(tenantId, clinicId, period, payload) {
+  try {
+    const ttl = APP_CONFIG.dashboardCacheTtlSeconds || 120;
+    const clone = JSON.parse(JSON.stringify(payload));
+    clone.cache = { hit: false, ttlSeconds: ttl };
+    CacheService.getScriptCache().put(getFinancialReportPayloadCacheKey_(tenantId, clinicId, period), JSON.stringify(clone), ttl);
+  } catch (err) {
+    // Cache is best-effort; reports can still be generated directly.
+  }
+}
+
+function invalidateFinancialReportCache_(tenantId, clinicId, period) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const keys = [];
+    if (period) keys.push(getFinancialReportPayloadCacheKey_(tenantId, clinicId, period));
+    keys.push(getFinancialReportPayloadCacheKey_(tenantId, clinicId, Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
+    cache.removeAll(Array.from(new Set(keys)));
+  } catch (err) {
+    // Best-effort cache invalidation.
+  }
 }
 
 function normalizeReportPeriod_(period) {

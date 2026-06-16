@@ -1,10 +1,9 @@
 function getDashboardPayload(tenantId, clinicId, period) {
   assertTenantScope_(tenantId, clinicId);
   const summary = getFinanceSummary(tenantId, clinicId, period) || computePocKpis(tenantId, clinicId, period);
-  const alerts = getRowsAsObjects_('ALERT_LOG')
-    .filter(r => r.tenant_id === tenantId && r.clinic_id === clinicId && r.status === 'open' && String(r.kpi_ref || '').indexOf(period) !== -1);
-  const daily = getRowsAsObjects_('KPI_HARIAN')
-    .filter(r => r.tenant_id === tenantId && r.clinic_id === clinicId && toPeriodString_(r.kpi_date) === period)
+  const alerts = getScopedRows_('ALERT_LOG', tenantId, clinicId)
+    .filter(r => r.status === 'open' && String(r.kpi_ref || '').indexOf(period) !== -1);
+  const daily = getScopedPeriodRows_('KPI_HARIAN', tenantId, clinicId, 'kpi_date', period)
     .sort((a, b) => String(a.kpi_date).localeCompare(String(b.kpi_date)));
   const revenueBreakdown = buildRevenueBreakdown_(tenantId, clinicId, period);
   const costBreakdown = buildCostBreakdown_(tenantId, clinicId, period);
@@ -155,6 +154,9 @@ function invalidateDashboardCache_(tenantId, clinicId, period) {
     // Best-effort cache invalidation.
   }
   if (typeof invalidateGrowthAssistantCache_ === 'function') invalidateGrowthAssistantCache_(tenantId, clinicId, period);
+  if (typeof invalidateFinancialReportCache_ === 'function') invalidateFinancialReportCache_(tenantId, clinicId, period);
+  if (typeof invalidateManualOptionsCache_ === 'function') invalidateManualOptionsCache_(tenantId, clinicId);
+  if (typeof invalidateTransactionListCache_ === 'function') invalidateTransactionListCache_(tenantId, clinicId, period);
 }
 
 function getLatestAvailablePeriod_() {
@@ -166,9 +168,9 @@ function getLatestAvailablePeriodForContext_(context) {
 }
 
 function getLatestAvailablePeriodForScope_(tenantId, clinicId) {
-  const rows = getRowsAsObjects_('KPI_BULANAN').filter(r => r.tenant_id === tenantId && r.clinic_id === clinicId);
+  const rows = getScopedRows_('KPI_BULANAN', tenantId, clinicId);
   if (rows.length) return rows.map(r => toPeriodString_(r.period)).filter(Boolean).sort().pop();
-  const rev = getRowsAsObjects_('PENDAPATAN').filter(r => r.tenant_id === tenantId && r.clinic_id === clinicId);
+  const rev = getScopedRows_('PENDAPATAN', tenantId, clinicId);
   if (rev.length) return rev.map(r => toPeriodString_(r.transaction_date)).sort().pop();
   return '';
 }
@@ -198,9 +200,9 @@ function normalizeSummaryForClient_(row) {
 
 
 function buildDashboardDataQualitySummary_(tenantId, clinicId, period, validationWarnings) {
-  const expenses = getRowsAsObjects_('BIAYA').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.expense_date, period));
-  const revenues = getRowsAsObjects_('PENDAPATAN').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.transaction_date, period));
-  const coaPending = getRowsAsObjects_('AI_COA_SUGGESTION').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.transaction_date, period) && String(r.review_status || '') === 'pending_review');
+  const expenses = getScopedPeriodRows_('BIAYA', tenantId, clinicId, 'expense_date', period);
+  const revenues = getScopedPeriodRows_('PENDAPATAN', tenantId, clinicId, 'transaction_date', period);
+  const coaPending = getScopedPeriodRows_('AI_COA_SUGGESTION', tenantId, clinicId, 'transaction_date', period).filter(r => String(r.review_status || '') === 'pending_review');
   const missingExpenseCoa = expenses.filter(r => !r.account_id).length;
   const missingExpenseCategory = expenses.filter(r => !r.expense_category).length;
   const missingRevenueCategory = revenues.filter(r => !r.revenue_type).length;
@@ -224,8 +226,8 @@ function buildDashboardDataQualitySummary_(tenantId, clinicId, period, validatio
 
 function getDashboardDataQualityWarnings_(tenantId, clinicId, period) {
   const importIds = {};
-  getRowsAsObjects_('PENDAPATAN').concat(getRowsAsObjects_('BIAYA'), getRowsAsObjects_('TINDAKAN'), getRowsAsObjects_('RESEP'))
-    .filter(row => inScope_(row, tenantId, clinicId) && (isInPeriod_(row.transaction_date, period) || isInPeriod_(row.expense_date, period) || isInPeriod_(row.procedure_date, period) || isInPeriod_(row.prescription_date, period)))
+  getScopedPeriodRows_('PENDAPATAN', tenantId, clinicId, 'transaction_date', period)
+    .concat(getScopedPeriodRows_('BIAYA', tenantId, clinicId, 'expense_date', period), getScopedPeriodRows_('TINDAKAN', tenantId, clinicId, 'procedure_date', period), getScopedPeriodRows_('RESEP', tenantId, clinicId, 'prescription_date', period))
     .forEach(row => { if (row.import_id) importIds[row.import_id] = true; });
   return getRowsAsObjects_('VALIDATION_LOG')
     .filter(row => row.tenant_id === tenantId && row.clinic_id === clinicId && importIds[row.import_id] && String(row.resolved || 'false').toLowerCase() !== 'true')
@@ -237,12 +239,12 @@ function normalizeValidationIssueForClient_(row) {
 }
 
 function buildRevenueBreakdown_(tenantId, clinicId, period) {
-  const revenues = getRowsAsObjects_('PENDAPATAN').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.transaction_date, period));
+  const revenues = getScopedPeriodRows_('PENDAPATAN', tenantId, clinicId, 'transaction_date', period);
   return groupRowsForBreakdown_(revenues, 'revenue_type', 'net_amount');
 }
 
 function buildCostBreakdown_(tenantId, clinicId, period) {
-  const expenses = getRowsAsObjects_('BIAYA').filter(r => inScope_(r, tenantId, clinicId) && isInPeriod_(r.expense_date, period));
+  const expenses = getScopedPeriodRows_('BIAYA', tenantId, clinicId, 'expense_date', period);
   return groupRowsForBreakdown_(expenses, 'expense_category', 'amount');
 }
 

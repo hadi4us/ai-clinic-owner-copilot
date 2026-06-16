@@ -227,8 +227,8 @@ function getCoaReviewQueueForContext_(context, limit) {
     label: [row.account_code, row.account_name].filter(Boolean).join(' - '),
     meta: row.account_type || ''
   }));
-  const rows = getRowsAsObjects_('AI_COA_SUGGESTION')
-    .filter(row => inScope_(row, context.tenantId, context.clinicId) && String(row.review_status || '') === 'pending_review')
+  const rows = getScopedRows_('AI_COA_SUGGESTION', context.tenantId, context.clinicId)
+    .filter(row => String(row.review_status || '') === 'pending_review')
     .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
     .slice(0, max)
     .map(normalizeCoaReviewSuggestionForClient_);

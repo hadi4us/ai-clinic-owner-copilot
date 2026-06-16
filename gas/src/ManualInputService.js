@@ -84,6 +84,8 @@ function saveDefaultManualClinicEntry(entry) {
 
 function getDefaultManualInputOptions() {
   const context = resolveRequestContext_({}, {}, 'finance');
+  const cached = getManualOptionsFromCache_(context.tenantId, context.clinicId);
+  if (cached) return cached;
   ensurePhase1WarehouseSheetsNoLock_();
   const active = row => String(row.status || 'active').toLowerCase() !== 'inactive';
   const doctors = getRowsAsObjects_('MASTER_DOKTER')
@@ -99,7 +101,7 @@ function getDefaultManualInputOptions() {
   const coa = getRowsAsObjects_('MASTER_COA')
     .filter(row => row.tenant_id === context.tenantId && active(row))
     .map(row => ({ value: row.account_id || row.account_code, label: [row.account_code, row.account_name].filter(Boolean).join(' - '), meta: row.account_type || '' }));
-  return {
+  const payload = {
     ok: true,
     doctors: doctors.length ? doctors : [{ value: 'doc_umum', label: 'Dokter Umum' }, { value: 'doc_gigi', label: 'Dokter Gigi' }],
     polis: polis.length ? polis : [{ value: 'poli_umum', label: 'Poli Umum' }, { value: 'poli_gigi', label: 'Poli Gigi' }, { value: 'poli_kia', label: 'KIA' }],
@@ -130,6 +132,8 @@ function getDefaultManualInputOptions() {
       { value: 'kia', label: 'KIA' }, { value: 'gigi', label: 'Gigi' }, { value: 'administrasi', label: 'Administrasi' }
     ]
   };
+  putManualOptionsCache_(context.tenantId, context.clinicId, payload);
+  return payload;
 }
 
 function getDefaultTransactionListPayload(type, period, limit) {
@@ -143,34 +147,36 @@ function getTransactionListPayloadForContext_(context, type, period, limit) {
   const normalizedType = normalizeHeaderKey_(type || 'all');
   const normalizedPeriod = normalizeTransactionListPeriod_(period || getLatestAvailablePeriodForTransactions_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'));
   const maxRows = Math.max(1, Math.min(Number(limit || 100), 300));
+  const cached = getTransactionListPayloadFromCache_(context.tenantId, context.clinicId, normalizedType, normalizedPeriod, maxRows);
+  if (cached) return cached;
   const rows = [];
   const include = name => normalizedType === 'all' || normalizedType === name;
   if (include('pendapatan')) {
-    getRowsAsObjects_('PENDAPATAN').filter(row => transactionRowInScope_(row, context, row.transaction_date, normalizedPeriod)).forEach(row => rows.push({
+    getScopedPeriodRows_('PENDAPATAN', context.tenantId, context.clinicId, 'transaction_date', normalizedPeriod).forEach(row => rows.push({
       type: 'pendapatan', date: toIsoDateString_(row.transaction_date), category: row.revenue_type || '', description: row.item_name || '', amount: asNumber_(row.net_amount, 0),
       paymentMethod: row.payment_method || '', payerType: row.payer_type || '', doctor: row.doctor_id || '', poli: row.poli_id || '', status: row.status || '', importId: row.import_id || '', id: row.revenue_id || row.transaction_id || '', sourceSheet: 'PENDAPATAN', editable: isManualTransactionRow_(row)
     }));
   }
   if (include('biaya')) {
-    getRowsAsObjects_('BIAYA').filter(row => transactionRowInScope_(row, context, row.expense_date, normalizedPeriod)).forEach(row => rows.push({
+    getScopedPeriodRows_('BIAYA', context.tenantId, context.clinicId, 'expense_date', normalizedPeriod).forEach(row => rows.push({
       type: 'biaya', date: toIsoDateString_(row.expense_date), category: row.expense_category || '', description: row.expense_name || '', amount: -Math.abs(asNumber_(row.amount, 0)),
       paymentMethod: row.payment_method || '', payerType: '', doctor: '', poli: '', status: row.status || '', importId: row.import_id || '', id: row.expense_id || '', accountId: row.account_id || '', costType: row.cost_type || '', sourceSheet: 'BIAYA', editable: isManualTransactionRow_(row)
     }));
   }
   if (include('pajak')) {
-    getRowsAsObjects_('PAJAK').filter(row => transactionRowInScope_(row, context, row.tax_period, normalizedPeriod)).forEach(row => rows.push({
+    getScopedPeriodRows_('PAJAK', context.tenantId, context.clinicId, 'tax_period', normalizedPeriod).forEach(row => rows.push({
       type: 'pajak', date: String(row.tax_period || normalizedPeriod).slice(0, 7), category: row.tax_type || '', description: row.notes || row.document_status || 'Rekap pajak', amount: -Math.abs(asNumber_(row.tax_payable, 0)),
       paymentMethod: '', payerType: '', doctor: '', poli: '', status: row.document_status || '', importId: row.import_id || '', id: row.tax_id || '', sourceSheet: 'PAJAK', editable: isManualTransactionRow_(row)
     }));
   }
   if (include('kunjungan')) {
-    getRowsAsObjects_('KUNJUNGAN').filter(row => transactionRowInScope_(row, context, row.visit_date, normalizedPeriod)).forEach(row => rows.push({
+    getScopedPeriodRows_('KUNJUNGAN', context.tenantId, context.clinicId, 'visit_date', normalizedPeriod).forEach(row => rows.push({
       type: 'kunjungan', date: toIsoDateString_(row.visit_date), category: row.service_category || '', description: row.service_name || '', amount: 0,
       paymentMethod: '', payerType: row.payer_type || row.patient_type || '', doctor: row.doctor_id || '', poli: row.poli_id || '', status: row.status || '', importId: row.import_id || '', id: row.visit_id || '', patientRef: row.patient_ref || '', sourceSheet: 'KUNJUNGAN', editable: isManualTransactionRow_(row)
     }));
   }
   rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id || '').localeCompare(String(a.id || '')));
-  return {
+  const payload = {
     ok: true,
     tenantId: context.tenantId,
     clinicId: context.clinicId,
@@ -182,6 +188,8 @@ function getTransactionListPayloadForContext_(context, type, period, limit) {
     availablePeriods: getAvailableTransactionPeriodsForContext_(context).slice(-18),
     generatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
   };
+  putTransactionListPayloadCache_(context.tenantId, context.clinicId, normalizedType, normalizedPeriod, maxRows, payload);
+  return payload;
 }
 
 function updateDefaultTransactionEntry(transaction) {
@@ -325,13 +333,91 @@ function getLatestAvailablePeriodForTransactions_(context) {
 
 function getAvailableTransactionPeriodsForContext_(context) {
   const values = [];
-  getRowsAsObjects_('PENDAPATAN').filter(row => inScope_(row, context.tenantId, context.clinicId)).forEach(row => values.push(toPeriodString_(row.transaction_date)));
-  getRowsAsObjects_('BIAYA').filter(row => inScope_(row, context.tenantId, context.clinicId)).forEach(row => values.push(toPeriodString_(row.expense_date)));
-  getRowsAsObjects_('PAJAK').filter(row => inScope_(row, context.tenantId, context.clinicId)).forEach(row => values.push(toPeriodString_(row.tax_period)));
-  getRowsAsObjects_('KUNJUNGAN').filter(row => inScope_(row, context.tenantId, context.clinicId)).forEach(row => values.push(toPeriodString_(row.visit_date)));
+  getScopedRows_('PENDAPATAN', context.tenantId, context.clinicId).forEach(row => values.push(toPeriodString_(row.transaction_date)));
+  getScopedRows_('BIAYA', context.tenantId, context.clinicId).forEach(row => values.push(toPeriodString_(row.expense_date)));
+  getScopedRows_('PAJAK', context.tenantId, context.clinicId).forEach(row => values.push(toPeriodString_(row.tax_period)));
+  getScopedRows_('KUNJUNGAN', context.tenantId, context.clinicId).forEach(row => values.push(toPeriodString_(row.visit_date)));
   return Array.from(new Set(values.filter(Boolean))).sort();
 }
 
 function transactionRowInScope_(row, context, dateValue, period) {
   return row && row.tenant_id === context.tenantId && row.clinic_id === context.clinicId && toPeriodString_(dateValue) === String(period || '').slice(0, 7);
+}
+
+function getManualOptionsCacheKey_(tenantId, clinicId) {
+  return ['manual_options_v1', tenantId, clinicId].join(':');
+}
+
+function getManualOptionsFromCache_(tenantId, clinicId) {
+  try {
+    const raw = CacheService.getScriptCache().get(getManualOptionsCacheKey_(tenantId, clinicId));
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    payload.cache = { hit: true, ttlSeconds: APP_CONFIG.dashboardCacheTtlSeconds || 120 };
+    return payload;
+  } catch (err) {
+    return null;
+  }
+}
+
+function putManualOptionsCache_(tenantId, clinicId, payload) {
+  try {
+    const ttl = APP_CONFIG.dashboardCacheTtlSeconds || 120;
+    const clone = JSON.parse(JSON.stringify(payload));
+    clone.cache = { hit: false, ttlSeconds: ttl };
+    CacheService.getScriptCache().put(getManualOptionsCacheKey_(tenantId, clinicId), JSON.stringify(clone), ttl);
+  } catch (err) {
+    // Best-effort cache.
+  }
+}
+
+function invalidateManualOptionsCache_(tenantId, clinicId) {
+  try { CacheService.getScriptCache().remove(getManualOptionsCacheKey_(tenantId, clinicId)); } catch (err) {}
+}
+
+function getTransactionListPayloadCacheKey_(tenantId, clinicId, type, period, limit) {
+  return ['transaction_list_v1', tenantId, clinicId, type || 'all', period || 'latest', limit || 100].join(':');
+}
+
+function getTransactionListPayloadFromCache_(tenantId, clinicId, type, period, limit) {
+  try {
+    const raw = CacheService.getScriptCache().get(getTransactionListPayloadCacheKey_(tenantId, clinicId, type, period, limit));
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    payload.cache = { hit: true, ttlSeconds: APP_CONFIG.dashboardCacheTtlSeconds || 120 };
+    return payload;
+  } catch (err) {
+    return null;
+  }
+}
+
+function putTransactionListPayloadCache_(tenantId, clinicId, type, period, limit, payload) {
+  try {
+    const ttl = APP_CONFIG.dashboardCacheTtlSeconds || 120;
+    const clone = JSON.parse(JSON.stringify(payload));
+    clone.cache = { hit: false, ttlSeconds: ttl };
+    CacheService.getScriptCache().put(getTransactionListPayloadCacheKey_(tenantId, clinicId, type, period, limit), JSON.stringify(clone), ttl);
+  } catch (err) {
+    // Best-effort cache.
+  }
+}
+
+function invalidateTransactionListCache_(tenantId, clinicId, period) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const periods = Array.from(new Set([period, Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')].filter(Boolean)));
+    const types = ['all', 'pendapatan', 'biaya', 'pajak', 'kunjungan'];
+    const limits = [50, 100, 200, 300];
+    const keys = [];
+    periods.forEach(function(p) {
+      types.forEach(function(type) {
+        limits.forEach(function(limit) {
+          keys.push(getTransactionListPayloadCacheKey_(tenantId, clinicId, type, p, limit));
+        });
+      });
+    });
+    cache.removeAll(keys);
+  } catch (err) {
+    // Best-effort cache invalidation.
+  }
 }

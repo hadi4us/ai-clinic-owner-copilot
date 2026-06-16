@@ -72,6 +72,7 @@ Excel conversion memakai Advanced Drive Service. Risiko:
 
 - `SpreadsheetApp.openById` sekarang di-cache dalam execution scope.
 - `getRowsAsObjects_` sekarang memakai execution-scope row cache dan invalidasi saat write.
+- Query tenant/clinic/period yang sering dipakai dashboard, compute, Growth AI, transaksi, dan laporan sekarang memakai scoped row cache agar satu request tidak memfilter sheet penuh berulang-ulang.
 - `ensureSheet_` menulis ulang header dan formatting.
 - Banyak service membaca sheet satu per satu.
 
@@ -107,6 +108,8 @@ Semakin banyak row, semua dashboard/API makin lambat. Multi-tenant memperparah k
 - Untuk raw data, partisi sheet per domain/periode/tenant jika tetap di Sheets.
 - Gunakan key-index sheet untuk row lookup.
 - Tambahkan row count guardrails.
+
+**Update 2026-06-17:** Hot path utama sekarang memakai `getScopedRows_` / `getScopedPeriodRows_` sebagai execution-scope filtered cache. Ini belum mengganti kebutuhan index/materialized table, tapi mengurangi full-sheet filtering berulang dalam satu eksekusi Apps Script.
 
 ---
 
