@@ -46,6 +46,11 @@ assertIncludes('gas/src/AuthService.js', [
   'never fall back to effectiveEmail as actor',
   'FORBIDDEN: actor tidak boleh mengakses tenant ini',
   'clinicScopeAllows_',
+  'getDefaultUserAccessPayload',
+  'saveDefaultUserAccessEntry',
+  'deactivateDefaultUserAccessEntry',
+  'USER_ACCESS_SELF_DEACTIVATE_BLOCKED',
+  "manageUsers: roleAllows_(role, 'owner')",
 ]);
 
 assertIncludes('gas/src/SpreadsheetService.js', [
@@ -110,6 +115,11 @@ assertNotIncludes('gas/src/ManualInputService.js', [
 
 assertIncludes('gas/src/Dashboard.html', [
   'Payload transaksi kosong dari server',
+  'Akun & Akses',
+  'view-account',
+  'loadUserAccess',
+  'saveUserAccess',
+  'deactivateUserAccess',
   'Periode tersedia:',
   'view-coa-review',
   'loadCoaReviewQueue',
@@ -216,9 +226,21 @@ for (const file of ['gas/src/Config.js', 'src/Core/Config.gs']) {
 
 const docs = read('docs/SOURCE_OF_TRUTH_AND_DEPLOYMENT.md');
 assert(docs.includes('A versioned deployment was updated from the `hadi4us@gmail.com`-authorized clasp user'), 'Docs must record the current hadi4us pilot deployment');
-assert(docs.includes('Version: `50`'), 'Docs must record the current versioned Apps Script version');
+assert(docs.includes('Version: `51`'), 'Docs must record the current versioned Apps Script version');
 assert(docs.includes('AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag'), 'Docs must record the current versioned deployment ID');
 assert(docs.includes('All Google-side resources for this project must use `hadi4us@gmail.com`'), 'Docs must state hadi4us Google account policy');
 assert(docs.includes('Deprecated ccc19depok deployments'), 'Docs must record old deployment deprecation');
+
+assertIncludes('docs/20-PRODUCTION-SAAS-ROADMAP.md', [
+  'P0.1 - Production Auth and User Access',
+  'P0.2 - Tenant Registry and Per-Tenant Warehouse',
+  'P0.4 - Job-Based Import Pipeline',
+]);
+
+assertIncludes('docs/21-PRODUCTION-SAAS-TASKS.md', [
+  'P0.1 Auth, Account, and User Access',
+  'Tenant Registry',
+  'Job-Based Import Pipeline',
+]);
 
 console.log('OK: static safety checks passed');

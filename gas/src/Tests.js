@@ -76,6 +76,16 @@ function testCrossTenantDenied() {
   }
 }
 
+function testUserAccessManagementStatic() {
+  const source = getFunctionSourceText_('getDefaultUserAccessPayload') + getFunctionSourceText_('saveUserAccessEntryForContext_') + getFunctionSourceText_('deactivateUserAccessEntryForContext_') + getFunctionSourceText_('permissionsForRole_');
+  if (source.indexOf('USER_ACCESS') === -1) throw new Error('User access management must operate on USER_ACCESS.');
+  if (source.indexOf("roleAllows_(context.role, 'owner')") === -1) throw new Error('User access management must require owner/admin role.');
+  if (source.indexOf('USER_ACCESS_SELF_DEACTIVATE_BLOCKED') === -1) throw new Error('User access management must block self-deactivation.');
+  if (source.indexOf('writeAudit_') === -1) throw new Error('User access management must write audit logs.');
+  if (source.indexOf("manageUsers: roleAllows_(role, 'owner')") === -1) throw new Error('Owner must have manageUsers permission.');
+  return { ok: true };
+}
+
 
 function testCriticalValidationBlocksFinalKpi() {
   const status = determinePocDataStatus_(1000000, 1, 'traceable', 1);
@@ -209,6 +219,7 @@ function runAllTests() {
     kpiPeriodNormalization: testKpiPeriodNormalizationStatic(),
     scopedRewriteHelpers: testScopedRewriteHelpersStatic(),
     coaSuggestionClassifier: testCoaSuggestionClassifierStatic(),
+    userAccessManagement: testUserAccessManagementStatic(),
     unknownUser: testUnknownUserDenied(),
     crossTenant: testCrossTenantDenied(),
   };

@@ -90,6 +90,166 @@ function clearDefaultBrowserSession() {
   return getDefaultAuthState();
 }
 
+function getDefaultUserAccessPayload() {
+  const context = resolveRequestContext_({}, {}, 'owner');
+  return getUserAccessPayloadForContext_(context);
+}
+
+function getUserAccessPayloadForContext_(context) {
+  assertTenantScope_(context.tenantId, context.clinicId);
+  if (!roleAllows_(context.role, 'owner')) throw new Error('FORBIDDEN: hanya owner/admin yang boleh mengelola USER_ACCESS.');
+  const rows = getRowsAsObjects_('USER_ACCESS')
+    .filter(row => String(row.tenant_id || '') === context.tenantId)
+    .sort((a, b) => String(a.email || a.user_id || '').localeCompare(String(b.email || b.user_id || '')))
+    .map(normalizeUserAccessForClient_);
+  return {
+    ok: true,
+    tenantId: context.tenantId,
+    clinicId: context.clinicId,
+    currentUser: context.userEmail || context.actorId || '',
+    rows,
+    roles: getUserAccessRoleOptions_(),
+    generatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
+  };
+}
+
+function saveDefaultUserAccessEntry(entry) {
+  const context = resolveRequestContext_({}, {}, 'owner');
+  return saveUserAccessEntryForContext_(context, entry || {});
+}
+
+function deactivateDefaultUserAccessEntry(email) {
+  const context = resolveRequestContext_({}, {}, 'owner');
+  return deactivateUserAccessEntryForContext_(context, email);
+}
+
+function saveUserAccessEntryForContext_(context, entry) {
+  assertTenantScope_(context.tenantId, context.clinicId);
+  if (!roleAllows_(context.role, 'owner')) throw new Error('FORBIDDEN: hanya owner/admin yang boleh mengelola USER_ACCESS.');
+  const normalized = normalizeUserAccessInput_(context, entry || {});
+  return withTenantClinicLock_('user_access_save', context.tenantId, context.clinicId, function() {
+    ensurePhase1WarehouseSheetsNoLock_();
+    const rows = getRowsAsObjects_('USER_ACCESS');
+    let updated = false;
+    const now = new Date();
+    const nextRows = rows.map(function(row) {
+      if (String(row.tenant_id || '') !== context.tenantId) return row;
+      if (!userMatchesAccessRow_(normalized.email, row)) return row;
+      if (String(normalized.status || '').toLowerCase() !== 'active' && userMatchesAccessRow_(context.userEmail || context.actorId, row)) {
+        throw new Error('USER_ACCESS_SELF_DEACTIVATE_BLOCKED: tidak boleh menonaktifkan akses sendiri.');
+      }
+      updated = true;
+      row.user_id = normalized.email;
+      row.user_name = normalized.userName;
+      row.email = normalized.email;
+      row.role = normalized.role;
+      row.clinic_scope = normalized.clinicScope;
+      row.status = normalized.status;
+      row.updated_at = now;
+      return row;
+    });
+    if (!updated) {
+      nextRows.push({
+        tenant_id: context.tenantId,
+        user_id: normalized.email,
+        user_name: normalized.userName,
+        email: normalized.email,
+        telegram_id: '',
+        whatsapp_id: '',
+        role: normalized.role,
+        clinic_scope: normalized.clinicScope,
+        status: normalized.status,
+        last_login_at: '',
+        created_at: now,
+        updated_at: now,
+      });
+    }
+    replaceObjects_('USER_ACCESS', nextRows);
+    writeAudit_(context.userEmail || context.actorId || 'owner', context.role || 'owner', updated ? 'user_access_update' : 'user_access_create', 'USER_ACCESS', {
+      email: normalized.email,
+      role: normalized.role,
+      clinicScope: normalized.clinicScope,
+      status: normalized.status,
+    });
+    return getUserAccessPayloadForContext_(context);
+  });
+}
+
+function deactivateUserAccessEntryForContext_(context, email) {
+  assertTenantScope_(context.tenantId, context.clinicId);
+  if (!roleAllows_(context.role, 'owner')) throw new Error('FORBIDDEN: hanya owner/admin yang boleh mengelola USER_ACCESS.');
+  const normalizedEmail = normalizeEmail_(email);
+  if (!normalizedEmail) throw new Error('Email wajib diisi.');
+  if (normalizedEmail === normalizeEmail_(context.userEmail || context.actorId)) throw new Error('USER_ACCESS_SELF_DEACTIVATE_BLOCKED: tidak boleh menonaktifkan akses sendiri.');
+  return withTenantClinicLock_('user_access_deactivate', context.tenantId, context.clinicId, function() {
+    let found = false;
+    updateObjectsWhere_('USER_ACCESS', function(row) {
+      return String(row.tenant_id || '') === context.tenantId && userMatchesAccessRow_(normalizedEmail, row);
+    }, function(row) {
+      found = true;
+      row.status = 'inactive';
+      row.updated_at = new Date();
+      return row;
+    });
+    if (!found) throw new Error('USER_ACCESS_NOT_FOUND: email tidak ditemukan.');
+    writeAudit_(context.userEmail || context.actorId || 'owner', context.role || 'owner', 'user_access_deactivate', 'USER_ACCESS', { email: normalizedEmail });
+    return getUserAccessPayloadForContext_(context);
+  });
+}
+
+function normalizeUserAccessInput_(context, entry) {
+  const email = normalizeEmail_(entry.email || entry.userId || entry.user_id);
+  if (!email) throw new Error('Email user wajib diisi.');
+  if (email.indexOf('@') === -1) throw new Error('Email user tidak valid.');
+  const role = normalizeRole_(entry.role || 'viewer');
+  if (getUserAccessRoleOptions_().map(r => r.value).indexOf(role) === -1) throw new Error('Role tidak valid: ' + role);
+  const status = String(entry.status || 'active').trim().toLowerCase();
+  if (['active', 'inactive'].indexOf(status) === -1) throw new Error('Status USER_ACCESS harus active atau inactive.');
+  return {
+    email,
+    userName: String(entry.userName || entry.user_name || email).trim() || email,
+    role,
+    clinicScope: String(entry.clinicScope || entry.clinic_scope || context.clinicId || APP_CONFIG.defaultClinicId).trim() || context.clinicId || APP_CONFIG.defaultClinicId,
+    status,
+  };
+}
+
+function normalizeUserAccessForClient_(row) {
+  const role = normalizeRole_(row.role);
+  return {
+    tenantId: row.tenant_id || '',
+    userId: row.user_id || row.email || '',
+    userName: row.user_name || row.email || row.user_id || '',
+    email: row.email || row.user_id || '',
+    role,
+    roleLabel: roleLabel_(role),
+    clinicScope: row.clinic_scope || '',
+    status: row.status || 'active',
+    lastLoginAt: formatDateTimeForClient_(row.last_login_at),
+    updatedAt: formatDateTimeForClient_(row.updated_at),
+  };
+}
+
+function getUserAccessRoleOptions_() {
+  return [
+    { value: 'viewer', label: 'Viewer' },
+    { value: 'staff', label: 'Staff' },
+    { value: 'finance', label: 'Finance/Admin' },
+    { value: 'manager', label: 'Manager' },
+    { value: 'owner', label: 'Owner' },
+    { value: 'admin', label: 'Admin' },
+  ];
+}
+
+function normalizeEmail_(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function formatDateTimeForClient_(value) {
+  if (!value) return '';
+  try { return Utilities.formatDate(new Date(value), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'); } catch (err) { return String(value || ''); }
+}
+
 function getBrowserSessionEmail_(temporaryUserKey) {
   if (!temporaryUserKey) return '';
   return getScriptProperty_('BROWSER_SESSION_EMAIL_' + hashBrowserSessionKey_(temporaryUserKey), '');
@@ -191,7 +351,7 @@ function permissionsForRole_(role) {
     manageSettings: roleAllows_(role, 'owner'),
     setup: roleAllows_(role, 'owner'),
     resetData: roleAllows_(role, 'owner'),
-    manageUsers: roleAllows_(role, 'admin'),
+    manageUsers: roleAllows_(role, 'owner'),
   };
 }
 
