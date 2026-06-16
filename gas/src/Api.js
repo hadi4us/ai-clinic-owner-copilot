@@ -1,7 +1,7 @@
 function healthCheck() {
   const spreadsheet = getWarehouseSpreadsheet_();
   const missingSheets = getPocSheetNames_().filter(name => !spreadsheet.getSheetByName(name));
-  return { ok: missingSheets.length === 0, appName: APP_CONFIG.appName, spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, missingSheets, aiEnabled: false, pocScope: ['upload_excel', 'manual_input', 'data_warehouse', 'kpi_engine', 'dashboard_revenue', 'dashboard_profit', 'financial_reports_id', 'tax_summary_id'] };
+  return { ok: missingSheets.length === 0, appName: APP_CONFIG.appName, spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, missingSheets, aiEnabled: false, pocScope: ['upload_excel', 'manual_input', 'data_warehouse', 'kpi_engine', 'dashboard_revenue', 'dashboard_profit', 'financial_reports_id', 'tax_summary_id', 'growth_ai_companion'] };
 }
 
 function doGet(e) {
@@ -21,6 +21,10 @@ function doGet(e) {
   if (action === 'transactionList') {
     const context = resolveRequestContext_(params, {}, 'finance');
     return jsonOutput_(getTransactionListPayloadForContext_(context, params.type || 'all', params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'), params.limit || 100));
+  }
+  if (action === 'growthAssistant') {
+    const context = resolveRequestContext_(params, {}, 'viewer');
+    return jsonOutput_(getGrowthAssistantPayloadForContext_(context, params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
   }
   if (['setup', 'compute', 'resetFixture', 'upload', 'manualInput', 'suggestCoa', 'approveCoaSuggestion', 'updateTransaction', 'deleteTransaction'].indexOf(action) !== -1) {
     return jsonOutput_({ ok: false, error: 'MUTATING_GET_DISABLED', message: 'Action mutasi hanya tersedia via POST dengan token pilot.' });

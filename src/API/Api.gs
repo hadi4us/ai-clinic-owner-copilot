@@ -1,19 +1,32 @@
 function healthCheck() {
   const spreadsheet = getWarehouseSpreadsheet_();
   const missingSheets = getPocSheetNames_().filter(name => !spreadsheet.getSheetByName(name));
-  return { ok: missingSheets.length === 0, appName: APP_CONFIG.appName, spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, missingSheets, aiEnabled: false, pocScope: ['upload_excel', 'data_warehouse', 'kpi_engine', 'dashboard_revenue', 'dashboard_profit'] };
+  return { ok: missingSheets.length === 0, appName: APP_CONFIG.appName, spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, missingSheets, aiEnabled: false, pocScope: ['upload_excel', 'manual_input', 'data_warehouse', 'kpi_engine', 'dashboard_revenue', 'dashboard_profit', 'financial_reports_id', 'tax_summary_id', 'growth_ai_companion'] };
 }
 
 function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
   const action = params.action;
+  if (action === 'authState') return jsonOutput_(getDefaultAuthState());
   if (action === 'health') return jsonOutput_(healthCheck());
   if (action === 'readiness') return jsonOutput_(readinessCheck());
   if (action === 'dashboardPayload') {
-    const context = resolveRequestContext_(params, {}, 'owner');
+    const context = resolveRequestContext_(params, {}, 'viewer');
     return jsonOutput_(getDashboardPayloadForContext_(context, params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
   }
-  if (['setup', 'compute', 'resetFixture', 'upload'].indexOf(action) !== -1) {
+  if (action === 'financialReport') {
+    const context = resolveRequestContext_(params, {}, 'finance');
+    return jsonOutput_(getFinancialReportPayload(context.tenantId, context.clinicId, params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
+  }
+  if (action === 'transactionList') {
+    const context = resolveRequestContext_(params, {}, 'finance');
+    return jsonOutput_(getTransactionListPayloadForContext_(context, params.type || 'all', params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM'), params.limit || 100));
+  }
+  if (action === 'growthAssistant') {
+    const context = resolveRequestContext_(params, {}, 'viewer');
+    return jsonOutput_(getGrowthAssistantPayloadForContext_(context, params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
+  }
+  if (['setup', 'compute', 'resetFixture', 'upload', 'manualInput', 'suggestCoa', 'approveCoaSuggestion', 'updateTransaction', 'deleteTransaction'].indexOf(action) !== -1) {
     return jsonOutput_({ ok: false, error: 'MUTATING_GET_DISABLED', message: 'Action mutasi hanya tersedia via POST dengan token pilot.' });
   }
 
@@ -29,7 +42,7 @@ function doPost(e) {
   const action = params.action || payload.action;
   if (action === 'upload') {
     assertPilotMutationAllowed_(params, payload);
-    const context = resolveRequestContext_(params, payload, 'owner');
+    const context = resolveRequestContext_(params, payload, 'finance');
     return jsonOutput_(uploadPocFileForContext_(context, payload.base64Data, payload.fileName, payload.mimeType, payload.options || {}));
   }
   if (action === 'setup') {
@@ -39,8 +52,33 @@ function doPost(e) {
   }
   if (action === 'compute') {
     assertPilotMutationAllowed_(params, payload);
-    const context = resolveRequestContext_(params, payload, 'owner');
+    const context = resolveRequestContext_(params, payload, 'finance');
     return jsonOutput_(computePocKpis(context.tenantId, context.clinicId, payload.period || params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
+  }
+  if (action === 'manualInput') {
+    assertPilotMutationAllowed_(params, payload);
+    const context = resolveRequestContext_(params, payload, 'finance');
+    return jsonOutput_(saveManualClinicEntryForContext_(context, payload.entry || payload));
+  }
+  if (action === 'suggestCoa') {
+    assertPilotMutationAllowed_(params, payload);
+    const context = resolveRequestContext_(params, payload, 'finance');
+    return jsonOutput_(suggestCoaForContext_(context, payload.entry || payload));
+  }
+  if (action === 'approveCoaSuggestion') {
+    assertPilotMutationAllowed_(params, payload);
+    const context = resolveRequestContext_(params, payload, 'finance');
+    return jsonOutput_(approveCoaSuggestionForContext_(context, payload.suggestionId || params.suggestionId, payload.approvedAccountId || params.approvedAccountId));
+  }
+  if (action === 'updateTransaction') {
+    assertPilotMutationAllowed_(params, payload);
+    const context = resolveRequestContext_(params, payload, 'finance');
+    return jsonOutput_(updateTransactionEntryForContext_(context, payload.transaction || payload));
+  }
+  if (action === 'deleteTransaction') {
+    assertPilotMutationAllowed_(params, payload);
+    const context = resolveRequestContext_(params, payload, 'finance');
+    return jsonOutput_(deleteTransactionEntryForContext_(context, payload.type || params.type, payload.id || params.id));
   }
   if (action === 'resetFixture') {
     assertPilotMutationAllowed_(params, payload);

@@ -34,6 +34,7 @@ Repository docs follow the requested `AI-Clinic-CFO-Copilot` structure:
 13. [Multitenancy](docs/12-MULTITENANCY.md)
 14. [COA](docs/13-COA.md)
 15. [Tax Engine](docs/14-TAX-ENGINE.md)
+16. [Growth AI MVP](docs/19-GROWTH-AI-MVP.md)
 
 Additional implementation docs are kept in `docs/` using the existing numbered lowercase filenames.
 
@@ -74,6 +75,7 @@ Implemented MVP V1 hardening:
 - Added `trace_status` and `trace_summary_json` to monthly finance metrics.
 - Finance Dashboard payload now exposes `traceStatus` alongside `dataStatus`.
 - Smoke test now verifies expected finance KPIs, trace map rows, journal rows, and balanced debit/credit journal lines.
+- Growth AI MVP now adds an owner-facing companion layer for anonymized follow-up segments, dormant/high-value patients, WhatsApp campaign drafts, and owner daily actions without replacing the clinic SIM.
 
 Important guardrail: finance numbers are reliable management metrics only when `data_status = complete` and `trace_status = traceable`. Otherwise, they must be treated as `estimated` or `incomplete`.
 
