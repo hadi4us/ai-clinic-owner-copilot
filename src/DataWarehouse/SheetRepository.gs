@@ -1,5 +1,11 @@
+var WAREHOUSE_SPREADSHEET_CACHE_ = null;
+var SHEET_ROWS_CACHE_ = {};
+
 function getWarehouseSpreadsheet_() {
-  return SpreadsheetApp.openById(getConfiguredSpreadsheetId_());
+  if (!WAREHOUSE_SPREADSHEET_CACHE_) {
+    WAREHOUSE_SPREADSHEET_CACHE_ = SpreadsheetApp.openById(getConfiguredSpreadsheetId_());
+  }
+  return WAREHOUSE_SPREADSHEET_CACHE_;
 }
 
 function getOrCreateSheet_(spreadsheet, sheetName) {
@@ -30,6 +36,7 @@ function clearDataKeepHeader_(sheet) {
 
 function clearSheetDataByName_(sheetName) {
   clearDataKeepHeader_(ensureSheet_(sheetName));
+  invalidateSheetRowsCache_(sheetName);
 }
 
 function appendRows_(sheet, rows) {
@@ -44,12 +51,14 @@ function appendObjects_(sheetName, objects) {
   const headers = getSheetSchema_(sheetName);
   const values = rows.map(row => headers.map(header => row[header] === undefined ? '' : row[header]));
   appendRows_(sheet, values);
+  invalidateSheetRowsCache_(sheetName);
   return { ok: true, appended: values.length };
 }
 
 function replaceObjects_(sheetName, objects) {
   const sheet = ensureSheet_(sheetName);
   clearDataKeepHeader_(sheet);
+  invalidateSheetRowsCache_(sheetName);
   return appendObjects_(sheetName, objects || []);
 }
 
@@ -80,21 +89,37 @@ function withTenantClinicLock_(operationName, tenantId, clinicId, callback) {
 }
 
 function getRowsAsObjects_(sheetName) {
+  if (SHEET_ROWS_CACHE_[sheetName]) return cloneRowsForRead_(SHEET_ROWS_CACHE_[sheetName]);
   const sheet = getWarehouseSpreadsheet_().getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() < 2) return [];
   const values = sheet.getDataRange().getValues();
   const headers = values.shift();
-  return values
+  const rows = values
     .filter(row => row.some(cell => cell !== '' && cell !== null && cell !== undefined))
     .map(row => headers.reduce((obj, header, index) => {
       if (header) obj[header] = row[index];
       return obj;
     }, {}));
+  SHEET_ROWS_CACHE_[sheetName] = rows;
+  return cloneRowsForRead_(rows);
+}
+
+function cloneRowsForRead_(rows) {
+  return (rows || []).map(row => Object.assign({}, row));
+}
+
+function invalidateSheetRowsCache_(sheetName) {
+  if (!sheetName) {
+    SHEET_ROWS_CACHE_ = {};
+    return;
+  }
+  delete SHEET_ROWS_CACHE_[sheetName];
 }
 
 function ensurePhase1WarehouseSheetsNoLock_() {
   const spreadsheet = getWarehouseSpreadsheet_();
   getPhase1SheetNames_().forEach(sheetName => setHeader_(getOrCreateSheet_(spreadsheet, sheetName), getSheetSchema_(sheetName)));
+  invalidateSheetRowsCache_();
   seedPocConfig_();
   writeAudit_('system', 'system', 'setup_final_warehouse_sheets', 'spreadsheet_schema', { schemaVersion: APP_CONFIG.schemaVersion, sheetCount: getPhase1SheetNames_().length });
   return { ok: true, spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, sheetsCreatedOrUpdated: getPhase1SheetNames_().length };

@@ -154,6 +154,7 @@ function invalidateDashboardCache_(tenantId, clinicId, period) {
   } catch (err) {
     // Best-effort cache invalidation.
   }
+  if (typeof invalidateGrowthAssistantCache_ === 'function') invalidateGrowthAssistantCache_(tenantId, clinicId, period);
 }
 
 function getLatestAvailablePeriod_() {

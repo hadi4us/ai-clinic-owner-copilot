@@ -49,9 +49,12 @@ assertIncludes('gas/src/AuthService.js', [
 ]);
 
 assertIncludes('gas/src/SpreadsheetService.js', [
+  'WAREHOUSE_SPREADSHEET_CACHE_',
+  'SHEET_ROWS_CACHE_',
   'LockService.getDocumentLock()',
   'tryLock(APP_CONFIG.lockWaitMs || 30000)',
   'getConfiguredSpreadsheetId_()',
+  'invalidateSheetRowsCache_',
   'replaceObjectsWhere_',
   'updateObjectsWhere_',
 ]);
@@ -152,6 +155,8 @@ assertIncludes('gas/src/Api.js', [
 
 assertIncludes('gas/src/GrowthAssistantService.js', [
   'getDefaultGrowthAssistantPayload',
+  'getGrowthAssistantPayloadCacheKey_',
+  'CacheService.getScriptCache()',
   'Pendamping SIM Klinik, bukan pengganti SIM.',
   'patientRef',
   'followupDue',
@@ -165,6 +170,10 @@ assertIncludes('gas/src/Dashboard.html', [
   'loadGrowthAssistant',
   'renderGrowthCampaigns',
   'Growth AI untuk Owner Klinik',
+]);
+
+assertIncludes('gas/src/DashboardService.js', [
+  'invalidateGrowthAssistantCache_',
 ]);
 
 assertIncludes('gas/src/COAAssistant.js', [
@@ -207,7 +216,7 @@ for (const file of ['gas/src/Config.js', 'src/Core/Config.gs']) {
 
 const docs = read('docs/SOURCE_OF_TRUTH_AND_DEPLOYMENT.md');
 assert(docs.includes('A versioned deployment was updated from the `hadi4us@gmail.com`-authorized clasp user'), 'Docs must record the current hadi4us pilot deployment');
-assert(docs.includes('Version: `48`'), 'Docs must record the current versioned Apps Script version');
+assert(docs.includes('Version: `49`'), 'Docs must record the current versioned Apps Script version');
 assert(docs.includes('AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag'), 'Docs must record the current versioned deployment ID');
 assert(docs.includes('All Google-side resources for this project must use `hadi4us@gmail.com`'), 'Docs must state hadi4us Google account policy');
 assert(docs.includes('Deprecated ccc19depok deployments'), 'Docs must record old deployment deprecation');

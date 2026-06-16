@@ -10,7 +10,7 @@ Bottleneck utama:
 - Whole-sheet rewrite untuk upsert/replace.
 - Import Excel memakai Drive conversion.
 - Tidak ada LockService untuk write contention.
-- Tidak ada CacheService untuk dashboard read-heavy.
+- Dashboard sudah memakai `CacheService`; Growth AI MVP juga memakai payload cache. Area read-heavy lain masih perlu cache/materialisasi bertahap.
 - Compute KPI membaca banyak sheet sekaligus dan filter di memory.
 - Google Apps Script runtime/quota tidak cocok untuk data besar/multi-tenant tanpa pembatasan.
 
@@ -70,7 +70,8 @@ Excel conversion memakai Advanced Drive Service. Risiko:
 
 **Temuan:**
 
-- `SpreadsheetApp.openById` dipanggil lewat helper setiap read/write.
+- `SpreadsheetApp.openById` sekarang di-cache dalam execution scope.
+- `getRowsAsObjects_` sekarang memakai execution-scope row cache dan invalidasi saat write.
 - `ensureSheet_` menulis ulang header dan formatting.
 - Banyak service membaca sheet satu per satu.
 
@@ -220,11 +221,12 @@ Concurrent upload/compute bisa saling overwrite terutama karena `replaceObjects_
 
 ---
 
-### PERF-010 — No CacheService untuk read-heavy dashboard
+### PERF-010 — CacheService coverage untuk read-heavy dashboard
 
 **Temuan:**
 
-- Tidak terlihat `CacheService`.
+- Dashboard dan Growth AI sudah memakai `CacheService` payload cache.
+- Financial report, transaction list, dan beberapa queue/review masih membaca sheet langsung.
 
 **Risiko:** Medium/High
 
@@ -232,9 +234,9 @@ Dashboard refresh berulang akan memukul spreadsheet langsung.
 
 **Rekomendasi:**
 
-- Cache dashboard payload per tenant/clinic/period.
+- Perluas cache payload per tenant/clinic/period ke report, transaction list, dan executive endpoints.
 - TTL 60–300 detik.
-- Invalidate setelah import/compute.
+- Invalidate setelah import/compute/manual input.
 
 ## Maintainability-Performance Coupling
 

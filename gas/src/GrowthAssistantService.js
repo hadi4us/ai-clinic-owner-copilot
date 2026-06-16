@@ -5,7 +5,11 @@
  */
 function getGrowthAssistantPayloadForContext_(context, period) {
   const resolvedPeriod = period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM');
-  return getGrowthAssistantPayload(context.tenantId, context.clinicId, resolvedPeriod);
+  const cached = getGrowthAssistantPayloadFromCache_(context.tenantId, context.clinicId, resolvedPeriod);
+  if (cached) return cached;
+  const payload = getGrowthAssistantPayload(context.tenantId, context.clinicId, resolvedPeriod);
+  putGrowthAssistantPayloadCache_(context.tenantId, context.clinicId, resolvedPeriod, payload);
+  return payload;
 }
 
 function getDefaultGrowthAssistantPayload(period) {
@@ -355,4 +359,44 @@ function maxGrowthDate_(currentValue, candidateValue) {
   if (!candidateValue) return currentValue || '';
   if (!currentValue) return candidateValue;
   return String(candidateValue) > String(currentValue) ? candidateValue : currentValue;
+}
+
+function getGrowthAssistantPayloadCacheKey_(tenantId, clinicId, period) {
+  return ['growth_ai_payload_v1', tenantId, clinicId, period || 'latest'].join(':');
+}
+
+function getGrowthAssistantPayloadFromCache_(tenantId, clinicId, period) {
+  try {
+    const raw = CacheService.getScriptCache().get(getGrowthAssistantPayloadCacheKey_(tenantId, clinicId, period));
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    payload.cache = { hit: true, ttlSeconds: APP_CONFIG.dashboardCacheTtlSeconds || 120 };
+    return payload;
+  } catch (err) {
+    return null;
+  }
+}
+
+function putGrowthAssistantPayloadCache_(tenantId, clinicId, period, payload) {
+  try {
+    const ttl = APP_CONFIG.dashboardCacheTtlSeconds || 120;
+    const clone = JSON.parse(JSON.stringify(payload));
+    clone.cache = { hit: false, ttlSeconds: ttl };
+    CacheService.getScriptCache().put(getGrowthAssistantPayloadCacheKey_(tenantId, clinicId, period), JSON.stringify(clone), ttl);
+  } catch (err) {
+    // Best effort. Growth AI should still render if cache is unavailable or payload grows too large.
+  }
+}
+
+function invalidateGrowthAssistantCache_(tenantId, clinicId, period) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const keys = [];
+    if (period) keys.push(getGrowthAssistantPayloadCacheKey_(tenantId, clinicId, period));
+    keys.push(getGrowthAssistantPayloadCacheKey_(tenantId, clinicId, Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
+    keys.push(getGrowthAssistantPayloadCacheKey_(tenantId, clinicId, getLatestAvailablePeriodForScope_(tenantId, clinicId) || 'latest'));
+    cache.removeAll(Array.from(new Set(keys)));
+  } catch (err) {
+    // Best-effort cache invalidation.
+  }
 }
