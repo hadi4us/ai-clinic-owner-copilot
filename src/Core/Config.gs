@@ -162,3 +162,20 @@ function getTenantRegistrySummary_() {
     };
   });
 }
+
+function saveTenantRegistry_(tenants) {
+  PropertiesService.getScriptProperties().setProperty('TENANT_REGISTRY_JSON', JSON.stringify({ tenants: tenants || {} }));
+}
+
+function upsertTenantRegistryEntry_(entry) {
+  const tenants = getTenantRegistry_();
+  const tenantId = String(entry && entry.tenantId || '').trim();
+  if (!tenantId) throw new Error('tenantId wajib diisi untuk registry.');
+  tenants[tenantId] = Object.assign({}, tenants[tenantId] || {}, entry, {
+    tenantId: tenantId,
+    updatedAt: new Date().toISOString(),
+  });
+  if (!tenants[tenantId].createdAt) tenants[tenantId].createdAt = tenants[tenantId].updatedAt;
+  saveTenantRegistry_(tenants);
+  return getTenantRegistryEntry_(tenantId);
+}

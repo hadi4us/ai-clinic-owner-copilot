@@ -202,3 +202,12 @@ Second implementation slice:
 3. Validate requested tenants before data access.
 4. Keep default pilot spreadsheet fallback.
 5. Add readiness/static checks for tenant registry.
+
+Third implementation slice:
+
+1. Add tenant provisioning service.
+2. Create tenant warehouse spreadsheets when needed.
+3. Seed schema, tenant metadata, clinic metadata, owner `USER_ACCESS`, and default COA.
+4. Add idempotency so rerunning provisioning does not create duplicate warehouses.
+5. Add tenant registry visibility and provisioning controls to Account/Akses.
+6. Reduce dashboard visual noise and tighten copy so the product feels operational, not demo-like.

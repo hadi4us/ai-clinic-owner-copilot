@@ -190,7 +190,24 @@ assertIncludes('gas/src/Dashboard.html', [
   'view-growth',
   'loadGrowthAssistant',
   'renderGrowthCampaigns',
-  'Growth AI untuk Owner Klinik',
+  'Growth Klinik',
+]);
+
+assertIncludes('gas/src/TenantProvisioningService.js', [
+  'provisionDefaultTenant',
+  'SpreadsheetApp.create',
+  'seedProvisionedTenantWarehouse_',
+  'ensureWarehouseSchemaOnlyNoLock_',
+  'replaceObjectsWhere_(\'USER_ACCESS\'',
+  'getDefaultTenantAdminPayload',
+]);
+
+assertIncludes('gas/src/Dashboard.html', [
+  'Tenant Provisioning',
+  'tenantRegistryRows',
+  'provisionTenant()',
+  'getDefaultTenantAdminPayload',
+  'provisionDefaultTenant',
 ]);
 
 assertIncludes('gas/src/DashboardService.js', [
@@ -246,6 +263,7 @@ assert(docs.includes('Deprecated ccc19depok deployments'), 'Docs must record old
 assertIncludes('docs/20-PRODUCTION-SAAS-ROADMAP.md', [
   'P0.1 - Production Auth and User Access',
   'P0.2 - Tenant Registry and Per-Tenant Warehouse',
+  'P0.3 - Tenant Provisioning',
   'P0.4 - Job-Based Import Pipeline',
 ]);
 

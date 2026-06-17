@@ -9,6 +9,7 @@ function doGet(e) {
   const action = params.action;
   if (action === 'authState') return jsonOutput_(getDefaultAuthState());
   if (action === 'userAccess') return jsonOutput_(getDefaultUserAccessPayload());
+  if (action === 'tenantAdmin') return jsonOutput_(getDefaultTenantAdminPayload());
   if (action === 'health') return jsonOutput_(healthCheck());
   if (action === 'readiness') return jsonOutput_(readinessCheck());
   if (action === 'dashboardPayload') {
@@ -91,6 +92,10 @@ function doPost(e) {
   }
   if (action === 'repairPilotOwnerAccess') {
     return jsonOutput_(repairPilotOwnerUserAccess());
+  }
+  if (action === 'provisionTenant') {
+    assertPilotMutationAllowed_(params, payload);
+    return jsonOutput_(provisionDefaultTenant(payload.tenant || payload));
   }
   if (action === 'resetFixture') {
     assertPilotMutationAllowed_(params, payload);

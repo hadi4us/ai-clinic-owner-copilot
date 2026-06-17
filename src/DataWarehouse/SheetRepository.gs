@@ -166,6 +166,17 @@ function ensurePhase1WarehouseSheetsNoLock_() {
   return { ok: true, tenantId: getActiveTenantId_(), spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, sheetsCreatedOrUpdated: getPhase1SheetNames_().length };
 }
 
+function ensureWarehouseSchemaOnlyNoLock_() {
+  const spreadsheet = getWarehouseSpreadsheet_();
+  getPhase1SheetNames_().forEach(sheetName => setHeader_(getOrCreateSheet_(spreadsheet, sheetName), getSheetSchema_(sheetName)));
+  const defaultSheet = spreadsheet.getSheetByName('Sheet1');
+  if (defaultSheet && spreadsheet.getSheets().length > 1 && defaultSheet.getLastRow() <= 1) {
+    spreadsheet.deleteSheet(defaultSheet);
+  }
+  invalidateSheetRowsCache_();
+  return { ok: true, tenantId: getActiveTenantId_(), spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, sheetsCreatedOrUpdated: getPhase1SheetNames_().length };
+}
+
 function setupFinalWarehouseSheets() {
   return withDocumentLock_('setup_final_warehouse_sheets', function() {
     return ensurePhase1WarehouseSheetsNoLock_();

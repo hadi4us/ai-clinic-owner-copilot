@@ -26,17 +26,17 @@ Status legend:
 - `[x]` Keep pilot default tenant fallback.
 - `[x]` Add readiness check for registry entry.
 - `[x]` Add static guard for cross-tenant spreadsheet resolution.
-- `[ ]` Add admin UI for tenant registry visibility.
-- `[ ]` Add provisioning workflow to create registry entries.
+- `[x]` Add admin UI for tenant registry visibility.
+- `[x]` Add provisioning workflow to create registry entries.
 
 ### P0.3 Tenant Provisioning
 
-- `[ ]` Add provisioning service.
-- `[ ]` Seed schema.
-- `[ ]` Seed owner access.
-- `[ ]` Seed tenant and clinic metadata.
-- `[ ]` Produce provisioning report.
-- `[ ]` Add idempotency behavior.
+- `[x]` Add provisioning service.
+- `[x]` Seed schema.
+- `[x]` Seed owner access.
+- `[x]` Seed tenant and clinic metadata.
+- `[x]` Produce provisioning report.
+- `[x]` Add idempotency behavior.
 
 ### P0.4 Job-Based Import Pipeline
 
@@ -77,4 +77,17 @@ Status legend:
 - `[x]` Backend user access management implemented.
 - `[x]` Static/local checks pass.
 - `[x]` Apps Script version deployed.
-- `[ ]` GitHub commit pushed.
+- `[x]` GitHub commit pushed.
+
+## Current Slice - P0.3 Provisioning + UI Polish
+
+- `[x]` Backend tenant provisioning service added.
+- `[x]` Tenant registry admin payload added.
+- `[x]` Provisioning creates or reuses tenant warehouse spreadsheet.
+- `[x]` Provisioning seeds schema, tenant, clinic, owner access, and default COA.
+- `[x]` Provisioning report returns spreadsheet URL and idempotency status.
+- `[x]` Account/Akses UI includes tenant provisioning and registry panels.
+- `[x]` Dashboard UI radius/copy toned down for a cleaner operational product feel.
+- `[x]` Static/local checks pass.
+- `[x]` Apps Script version deployed.
+- `[x]` GitHub commit pushed.
