@@ -9,6 +9,9 @@ function readinessCheck() {
   addReadinessCheck_(checks, 'mutation_token_configured', !!getPilotMutationToken_(), 'Set Script Property PILOT_MUTATION_TOKEN before setup/import/compute/reset via API.');
   addReadinessCheck_(checks, 'owner_email_configured', !!getScriptProperty_('PILOT_OWNER_EMAIL', ''), 'Set Script Property PILOT_OWNER_EMAIL, then run setup once to seed USER_ACCESS.');
   addReadinessCheck_(checks, 'spreadsheet_id_configured', !!getConfiguredSpreadsheetId_(), 'Set Script Property WAREHOUSE_SPREADSHEET_ID or keep APP_CONFIG spreadsheetId valid.', { spreadsheetIdSource: getScriptProperty_('WAREHOUSE_SPREADSHEET_ID', '') ? 'script_property' : 'APP_CONFIG' });
+  const tenantRegistry = getTenantRegistrySummary_();
+  addReadinessCheck_(checks, 'tenant_registry_configured', tenantRegistry.length > 0 && tenantRegistry.every(t => t.warehouseConfigured), 'Configure TENANT_REGISTRY_JSON for production tenant isolation, or keep pilot WAREHOUSE_SPREADSHEET_ID fallback.', { tenants: tenantRegistry.length });
+  addReadinessCheck_(checks, 'default_tenant_registered', !!getTenantRegistryEntry_(APP_CONFIG.defaultTenantId), 'Default tenant must exist in tenant registry or pilot fallback.');
 
   let spreadsheetOk = false;
   let missingSheets = [];
@@ -47,6 +50,7 @@ function readinessCheck() {
     appName: APP_CONFIG.appName,
     schemaVersion: APP_CONFIG.schemaVersion,
     spreadsheetId: maskId_(getConfiguredSpreadsheetId_()),
+    tenantRegistry,
     checks,
     nextActions: checks.filter(check => !check.ok).map(check => check.message),
   };

@@ -1,12 +1,27 @@
-var WAREHOUSE_SPREADSHEET_CACHE_ = null;
+var WAREHOUSE_SPREADSHEET_CACHE_ = {};
 var SHEET_ROWS_CACHE_ = {};
 var SHEET_SCOPE_ROWS_CACHE_ = {};
+var ACTIVE_TENANT_ID_ = '';
+
+function setActiveTenantContext_(tenantId) {
+  const nextTenantId = String(tenantId || APP_CONFIG.defaultTenantId).trim();
+  if (ACTIVE_TENANT_ID_ && ACTIVE_TENANT_ID_ !== nextTenantId) invalidateSheetRowsCache_();
+  ACTIVE_TENANT_ID_ = nextTenantId || APP_CONFIG.defaultTenantId;
+  return ACTIVE_TENANT_ID_;
+}
+
+function getActiveTenantId_() {
+  return ACTIVE_TENANT_ID_ || APP_CONFIG.defaultTenantId;
+}
 
 function getWarehouseSpreadsheet_() {
-  if (!WAREHOUSE_SPREADSHEET_CACHE_) {
-    WAREHOUSE_SPREADSHEET_CACHE_ = SpreadsheetApp.openById(getConfiguredSpreadsheetId_());
+  const tenantId = getActiveTenantId_();
+  const spreadsheetId = getConfiguredSpreadsheetId_(tenantId);
+  const cacheKey = [tenantId, spreadsheetId].join(':');
+  if (!WAREHOUSE_SPREADSHEET_CACHE_[cacheKey]) {
+    WAREHOUSE_SPREADSHEET_CACHE_[cacheKey] = SpreadsheetApp.openById(spreadsheetId);
   }
-  return WAREHOUSE_SPREADSHEET_CACHE_;
+  return WAREHOUSE_SPREADSHEET_CACHE_[cacheKey];
 }
 
 function getOrCreateSheet_(spreadsheet, sheetName) {
@@ -148,7 +163,7 @@ function ensurePhase1WarehouseSheetsNoLock_() {
   invalidateSheetRowsCache_();
   seedPocConfig_();
   writeAudit_('system', 'system', 'setup_final_warehouse_sheets', 'spreadsheet_schema', { schemaVersion: APP_CONFIG.schemaVersion, sheetCount: getPhase1SheetNames_().length });
-  return { ok: true, spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, sheetsCreatedOrUpdated: getPhase1SheetNames_().length };
+  return { ok: true, tenantId: getActiveTenantId_(), spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, sheetsCreatedOrUpdated: getPhase1SheetNames_().length };
 }
 
 function setupFinalWarehouseSheets() {

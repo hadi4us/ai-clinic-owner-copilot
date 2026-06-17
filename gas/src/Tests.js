@@ -86,6 +86,19 @@ function testUserAccessManagementStatic() {
   return { ok: true };
 }
 
+function testTenantRegistryStatic() {
+  const configSource = getFunctionSourceText_('getTenantRegistry_') + getFunctionSourceText_('getConfiguredSpreadsheetId_') + getFunctionSourceText_('assertTenantRegistryAllows_');
+  if (configSource.indexOf('TENANT_REGISTRY_JSON') === -1) throw new Error('Tenant registry must use TENANT_REGISTRY_JSON.');
+  if (configSource.indexOf('warehouseSpreadsheetId') === -1) throw new Error('Tenant registry must expose warehouseSpreadsheetId.');
+  if (configSource.indexOf('TENANT_NOT_REGISTERED') === -1) throw new Error('Tenant registry must reject unknown tenants.');
+  const sheetSource = getFunctionSourceText_('getWarehouseSpreadsheet_') + getFunctionSourceText_('setActiveTenantContext_');
+  if (sheetSource.indexOf('getActiveTenantId_') === -1) throw new Error('Warehouse resolver must use active tenant context.');
+  if (sheetSource.indexOf('invalidateSheetRowsCache_') === -1) throw new Error('Tenant switch must invalidate row caches.');
+  const authSource = getFunctionSourceText_('resolveRequestContext_') + getFunctionSourceText_('requireClinicAccess_');
+  if (authSource.indexOf('assertTenantRegistryAllows_') === -1) throw new Error('Auth context must validate tenant registry.');
+  return { ok: true };
+}
+
 
 function testCriticalValidationBlocksFinalKpi() {
   const status = determinePocDataStatus_(1000000, 1, 'traceable', 1);
@@ -220,6 +233,7 @@ function runAllTests() {
     scopedRewriteHelpers: testScopedRewriteHelpersStatic(),
     coaSuggestionClassifier: testCoaSuggestionClassifierStatic(),
     userAccessManagement: testUserAccessManagementStatic(),
+    tenantRegistry: testTenantRegistryStatic(),
     unknownUser: testUnknownUserDenied(),
     crossTenant: testCrossTenantDenied(),
   };

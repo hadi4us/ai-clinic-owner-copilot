@@ -1,7 +1,7 @@
 function healthCheck() {
   const spreadsheet = getWarehouseSpreadsheet_();
   const missingSheets = getPocSheetNames_().filter(name => !spreadsheet.getSheetByName(name));
-  return { ok: missingSheets.length === 0, appName: APP_CONFIG.appName, spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, missingSheets, aiEnabled: false, pocScope: ['upload_excel', 'manual_input', 'data_warehouse', 'kpi_engine', 'dashboard_revenue', 'dashboard_profit', 'financial_reports_id', 'tax_summary_id', 'growth_ai_companion'] };
+  return { ok: missingSheets.length === 0, appName: APP_CONFIG.appName, tenantId: getActiveTenantId_(), spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, tenantRegistry: getTenantRegistrySummary_(), missingSheets, aiEnabled: false, pocScope: ['upload_excel', 'manual_input', 'data_warehouse', 'kpi_engine', 'dashboard_revenue', 'dashboard_profit', 'financial_reports_id', 'tax_summary_id', 'growth_ai_companion'] };
 }
 
 function doGet(e) {

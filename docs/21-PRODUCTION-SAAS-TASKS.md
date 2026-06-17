@@ -21,11 +21,13 @@ Status legend:
 
 ### P0.2 Tenant Registry
 
-- `[ ]` Define tenant registry schema.
-- `[ ]` Add registry-backed spreadsheet resolution.
-- `[ ]` Keep pilot default tenant fallback.
-- `[ ]` Add readiness check for registry entry.
-- `[ ]` Add static guard for cross-tenant spreadsheet resolution.
+- `[x]` Define tenant registry schema.
+- `[x]` Add registry-backed spreadsheet resolution.
+- `[x]` Keep pilot default tenant fallback.
+- `[x]` Add readiness check for registry entry.
+- `[x]` Add static guard for cross-tenant spreadsheet resolution.
+- `[ ]` Add admin UI for tenant registry visibility.
+- `[ ]` Add provisioning workflow to create registry entries.
 
 ### P0.3 Tenant Provisioning
 

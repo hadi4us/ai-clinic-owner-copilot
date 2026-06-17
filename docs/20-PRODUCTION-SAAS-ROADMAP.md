@@ -42,6 +42,34 @@ Done when:
 
 Goal: each tenant has isolated warehouse config instead of relying on one shared spreadsheet.
 
+Initial implementation uses Script Property `TENANT_REGISTRY_JSON` as the master registry so the Apps Script project can resolve tenant warehouse spreadsheets before opening a tenant spreadsheet. The existing pilot `WAREHOUSE_SPREADSHEET_ID` remains a fallback for `APP_CONFIG.defaultTenantId`.
+
+Registry shape:
+
+```json
+{
+  "tenants": {
+    "klinik_001": {
+      "tenantId": "klinik_001",
+      "tenantName": "Klinik Sehat Sentosa",
+      "status": "active",
+      "plan": "pilot",
+      "ownerEmail": "owner@example.com",
+      "warehouseSpreadsheetId": "spreadsheet_id",
+      "defaultClinicId": "clinic_001"
+    }
+  }
+}
+```
+
+Rules:
+
+- `status` must be `active` or `trial` for normal access.
+- Unknown tenants are rejected.
+- Every production tenant must have a `warehouseSpreadsheetId`.
+- Switching active tenant invalidates execution-scope sheet caches.
+- Pilot fallback is allowed only for the default tenant while P0.3 provisioning is not finished.
+
 Tasks:
 
 - Define `TENANT_REGISTRY` contract.
@@ -167,3 +195,10 @@ First implementation slice:
 4. Add static/local checks.
 5. Deploy as next Apps Script version.
 
+Second implementation slice:
+
+1. Add tenant registry contract and Script Property resolver.
+2. Resolve warehouse spreadsheet by active tenant context.
+3. Validate requested tenants before data access.
+4. Keep default pilot spreadsheet fallback.
+5. Add readiness/static checks for tenant registry.

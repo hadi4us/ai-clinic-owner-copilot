@@ -19,6 +19,7 @@ function resolveRequestContext_(params, payload, requiredRole) {
   const actor = getCurrentActor_();
   const requestedTenantId = (params && params.tenantId) || (payload && payload.tenantId) || '';
   const requestedClinicId = (params && params.clinicId) || (payload && payload.clinicId) || '';
+  if (requestedTenantId) setActiveTenantContext_(requestedTenantId);
   return requireClinicAccess_(actor, requestedTenantId, requestedClinicId, requiredRole || 'owner');
 }
 
@@ -283,11 +284,14 @@ function sha256Hex_(value) {
 function requireClinicAccess_(actor, requestedTenantId, requestedClinicId, requiredRole) {
   const userId = actor && actor.userId ? String(actor.userId).trim().toLowerCase() : '';
   if (!userId) throw new Error('UNAUTHENTICATED: Google session tidak terdeteksi. Gunakan akses web app terbatas, bukan anonymous, untuk data pilot.');
+  if (requestedTenantId) assertTenantRegistryAllows_(requestedTenantId);
   const accessRows = getRowsAsObjects_('USER_ACCESS').filter(row => userMatchesAccessRow_(userId, row) && String(row.status || 'active').toLowerCase() === 'active');
   if (!accessRows.length) throw new Error('FORBIDDEN: user belum terdaftar di USER_ACCESS.');
   const allowedRows = accessRows.filter(row => roleAllows_(row.role, requiredRole || 'owner'));
   if (!allowedRows.length) throw new Error('FORBIDDEN: role user tidak cukup untuk action ini.');
   const tenantId = requestedTenantId || allowedRows[0].tenant_id;
+  setActiveTenantContext_(tenantId);
+  assertTenantRegistryAllows_(tenantId);
   if (!tenantId) throw new Error('FORBIDDEN: tenant context tidak tersedia.');
   const tenantRows = allowedRows.filter(row => row.tenant_id === tenantId);
   if (!tenantRows.length) throw new Error('FORBIDDEN: actor tidak boleh mengakses tenant ini.');

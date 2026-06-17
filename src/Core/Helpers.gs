@@ -98,7 +98,7 @@ function writeAudit_(actorId, role, action, resource, metadata) {
   const sheet = getWarehouseSpreadsheet_().getSheetByName('AUDIT_LOG');
   if (!sheet) return;
   appendObjects_('AUDIT_LOG', [{
-    tenant_id: APP_CONFIG.defaultTenantId,
+    tenant_id: getActiveTenantId_(),
     audit_id: Utilities.getUuid(),
     user_id: actorId || 'system',
     action,
