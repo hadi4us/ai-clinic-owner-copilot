@@ -103,12 +103,19 @@ function loginDefaultPasswordSession(username, password) {
   if (!providedPassword) throw new Error('Password wajib diisi.');
   const rows = getActiveUserAccessRowsForLogin_(normalizedUsername);
   if (!rows.length) throw new Error('FORBIDDEN: username belum terdaftar aktif di USER_ACCESS.');
-  if (!isPasswordLoginConfiguredForAccessRow_(rows[0], normalizedUsername)) throw new Error('PASSWORD_LOGIN_NOT_CONFIGURED: password login belum dikonfigurasi untuk akun ini.');
-  if (!passwordMatchesAccessRow_(rows[0], normalizedUsername, providedPassword)) throw new Error('Username atau password salah.');
+  const configuredRows = rows.filter(function(row) {
+    return isPasswordLoginConfiguredForAccessRow_(row, normalizedUsername);
+  });
+  if (!configuredRows.length) throw new Error('PASSWORD_LOGIN_NOT_CONFIGURED: password login belum dikonfigurasi untuk akun ini.');
+  const matchedRow = configuredRows.find(function(row) {
+    return passwordMatchesAccessRow_(row, normalizedUsername, providedPassword);
+  });
+  if (!matchedRow) throw new Error('Username atau password salah.');
   setBrowserSessionEmail_(temporaryUserKey, normalizedUsername);
-  setActiveTenantContext_(rows[0].tenant_id || APP_CONFIG.defaultTenantId);
-  writeAudit_(normalizedUsername, normalizeRole_(rows[0].role) || 'viewer', 'password_login', 'USER_ACCESS', {
+  setActiveTenantContext_(matchedRow.tenant_id || APP_CONFIG.defaultTenantId);
+  writeAudit_(normalizedUsername, normalizeRole_(matchedRow.role) || 'viewer', 'password_login', 'USER_ACCESS', {
     email: normalizedUsername,
+    tenantId: matchedRow.tenant_id || '',
     source: 'password_session',
   });
   return getDefaultAuthState();
