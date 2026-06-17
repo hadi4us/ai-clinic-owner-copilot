@@ -16,7 +16,8 @@ Status legend:
 - `[x]` Add create/update/deactivate `USER_ACCESS` actions.
 - `[x]` Audit user access changes.
 - `[x]` Add owner/admin guardrail tests for user management.
-- `[ ]` Improve unauthenticated access gate copy for production.
+- `[x]` Add username/password login fallback backed by USER_ACCESS.
+- `[x]` Improve unauthenticated access gate copy for production.
 - `[ ]` Add support doc for owner/admin user onboarding.
 
 ### P0.2 Tenant Registry

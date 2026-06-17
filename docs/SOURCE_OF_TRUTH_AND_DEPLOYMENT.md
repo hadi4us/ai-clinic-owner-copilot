@@ -26,9 +26,9 @@ The root `src/` tree is a clean architecture mirror/reference. Do not edit root 
 
 - Public `GET` is read-only except dashboard rendering and health/dashboard payload.
 - Mutating actions (`setup`, `compute`, `resetFixture`, `upload`) are POST-only for API calls and require `PILOT_MUTATION_TOKEN` when called through `doPost`.
-- Dashboard/API data calls resolve tenant/clinic from `USER_ACCESS`, using the active Google session. Query/body `tenantId` and `clinicId` are only selectors after `requireClinicAccess_` passes.
+- Dashboard/API data calls resolve tenant/clinic from `USER_ACCESS`. The web UI now uses username/password session binding first because consumer Gmail can fail to expose a stable Apps Script user email; Google active/effective user remains a compatibility fallback. Query/body `tenantId` and `clinicId` are only selectors after `requireClinicAccess_` passes.
 - Dashboard internal `google.script.run.uploadPocFile` also resolves the same verified session context before import.
-- Unknown users and cross-tenant requests are denied. `Session.getEffectiveUser()` is audit metadata only and is never used as actor fallback.
+- Unknown users and cross-tenant requests are denied. `Session.getEffectiveUser()` is only accepted as a guarded compatibility fallback when the manifest is `executeAs: USER_ACCESSING` and the effective email is the pilot owner or an active `USER_ACCESS` row.
 - Bootstrap setup is the only token-only mutating action because it may need to create initial `USER_ACCESS` from Script Property `PILOT_OWNER_EMAIL`. After setup, data/dashboard/import/compute/reset require verified session access.
 - Manifest web app access is set to `ANYONE` (Google sign-in required) and `executeAs` is `USER_ACCESSING` so the active Google account can be verified against `USER_ACCESS`. Keep it non-anonymous for pilot data and set Script Property `PILOT_OWNER_EMAIL` before running setup.
 
@@ -66,7 +66,8 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
   1. `PILOT_MUTATION_TOKEN` Script Property set.
   2. `PILOT_OWNER_EMAIL` Script Property set.
   3. Run setup once so `USER_ACCESS` contains the pilot owner.
-  4. Warehouse schema exists and KPI data is available via fixture or import+compute.
+  4. Configure `PILOT_OWNER_PASSWORD_SHA256` for the owner password, or temporarily keep the existing pilot browser-code hash as the owner login fallback during pilot smoke.
+  5. Warehouse schema exists and KPI data is available via fixture or import+compute.
 - `WAREHOUSE_SPREADSHEET_ID` Script Property is required for pilot deployment. No fallback spreadsheet ID is approved while migrating away from old `ccc19depok@gmail.com` resources.
 
 ## Current pilot deployment
@@ -74,10 +75,10 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
 A versioned deployment was updated from the `hadi4us@gmail.com`-authorized clasp user on 2026-06-17.
 
 - Apps Script ID: `1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy`
-- Version: `56` — `Effective-user auth fallback 2026-06-17`
+- Version: `57` — `Username password login slice 2026-06-17`
 - Deployment ID: `AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag`
 - Web app URL: `https://script.google.com/macros/s/AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag/exec`
-- Readiness status: previous authenticated smoke test passed as `hadi4us@gmail.com`; latest deployment adds USER_ACCESSING effective-user fallback for consumer Gmail sessions where `Session.getActiveUser().getEmail()` is blank.
+- Readiness status: previous authenticated smoke test passed as `hadi4us@gmail.com`; latest deployment adds USER_ACCESS username/password login so the browser no longer depends on `Session.getActiveUser().getEmail()`.
 
 The previous versioned deployment under `ccc19depok@gmail.com` was undeployed and must not be used.
 

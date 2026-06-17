@@ -9,14 +9,14 @@ function getCurrentActor_() {
   try { effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase(); } catch (err) { effectiveEmail = ''; }
   let temporaryUserKey = '';
   try { temporaryUserKey = String(Session.getTemporaryActiveUserKey() || '').trim(); } catch (err) { temporaryUserKey = ''; }
-  const boundEmail = !email && temporaryUserKey ? getBrowserSessionEmail_(temporaryUserKey) : '';
-  const effectiveFallbackEmail = !email && !boundEmail ? getTrustedEffectiveUserEmail_(effectiveEmail) : '';
+  const boundEmail = temporaryUserKey ? getBrowserSessionEmail_(temporaryUserKey) : '';
+  const effectiveFallbackEmail = !boundEmail && !email ? getTrustedEffectiveUserEmail_(effectiveEmail) : '';
   return {
-    userId: email || boundEmail || effectiveFallbackEmail,
-    email: email || boundEmail || effectiveFallbackEmail,
+    userId: boundEmail || email || effectiveFallbackEmail,
+    email: boundEmail || email || effectiveFallbackEmail,
     effectiveEmail,
     temporaryUserKey,
-    actorSource: email ? 'active_user' : (boundEmail ? 'browser_binding' : (effectiveFallbackEmail ? 'effective_user_accessing' : 'none')),
+    actorSource: boundEmail ? 'password_session' : (email ? 'active_user' : (effectiveFallbackEmail ? 'effective_user_accessing' : 'none')),
     channel: 'gas_webapp'
   };
 }
@@ -50,12 +50,13 @@ function getDefaultAuthState() {
     ok: false,
     authenticated: false,
     requiresBrowserLogin: true,
+    requiresPasswordLogin: true,
     hasTemporaryUserKey: !!(actor && actor.temporaryUserKey),
     error: 'UNAUTHENTICATED',
-    message: 'Google session belum mengirim email. Bind browser ini ke email USER_ACCESS dengan kode login pilot.'
+    message: 'Masuk dengan username dan password untuk mencocokkan akun di USER_ACCESS.'
   };
   const rows = getRowsAsObjects_('USER_ACCESS').filter(row => userMatchesAccessRow_(userId, row) && String(row.status || 'active').toLowerCase() === 'active');
-  if (!rows.length) return { ok: false, authenticated: true, authorized: false, email: userId, effectiveEmail: actor.effectiveEmail || '', error: 'FORBIDDEN', message: 'Akun ini belum terdaftar di USER_ACCESS.' };
+  if (!rows.length) return { ok: false, authenticated: true, authorized: false, email: userId, effectiveEmail: actor.effectiveEmail || '', requiresPasswordLogin: true, error: 'FORBIDDEN', message: 'Akun ini belum terdaftar di USER_ACCESS. Masuk ulang dengan username yang benar.' };
   const contexts = rows.map(row => {
     const role = normalizeRole_(row.role);
     return {
@@ -89,6 +90,29 @@ function getDefaultAuthState() {
   };
 }
 
+
+function loginDefaultPasswordSession(username, password) {
+  const actor = getCurrentActor_();
+  const temporaryUserKey = actor && actor.temporaryUserKey ? String(actor.temporaryUserKey).trim() : '';
+  if (!temporaryUserKey) throw new Error('UNAUTHENTICATED: browser belum punya session key. Refresh halaman lalu coba login lagi.');
+  const normalizedUsername = normalizeEmail_(username);
+  if (!normalizedUsername) throw new Error('Username wajib diisi.');
+  const providedPassword = String(password || '');
+  if (!providedPassword) throw new Error('Password wajib diisi.');
+  const rows = getRowsAsObjects_('USER_ACCESS').filter(function(row) {
+    return userMatchesAccessRow_(normalizedUsername, row) && String(row.status || 'active').toLowerCase() === 'active';
+  });
+  if (!rows.length) throw new Error('FORBIDDEN: username belum terdaftar aktif di USER_ACCESS.');
+  const passwordHash = getPasswordLoginHashForAccessRow_(rows[0], normalizedUsername);
+  if (!passwordHash) throw new Error('PASSWORD_LOGIN_NOT_CONFIGURED: password login belum dikonfigurasi untuk akun ini.');
+  if (sha256Hex_(providedPassword) !== String(passwordHash).trim().toLowerCase()) throw new Error('Username atau password salah.');
+  setBrowserSessionEmail_(temporaryUserKey, normalizedUsername);
+  writeAudit_(normalizedUsername, normalizeRole_(rows[0].role) || 'viewer', 'password_login', 'USER_ACCESS', {
+    email: normalizedUsername,
+    source: 'password_session',
+  });
+  return getDefaultAuthState();
+}
 
 function bindDefaultBrowserSession(email, code) {
   const actor = getCurrentActor_();
@@ -337,6 +361,35 @@ function getUserAccessRoleOptions_() {
 
 function normalizeEmail_(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function getPasswordLoginHashForAccessRow_(row, username) {
+  const rowHash = String(row.password_hash || row.login_password_hash || '').trim().toLowerCase();
+  if (rowHash) return rowHash;
+  const normalizedUsername = normalizeEmail_(username || row.email || row.user_id);
+  const ownerEmail = normalizeEmail_(getScriptProperty_('PILOT_OWNER_EMAIL', ''));
+  if (ownerEmail && normalizedUsername === ownerEmail) {
+    return String(
+      getScriptProperty_('PILOT_OWNER_PASSWORD_SHA256', '') ||
+      getScriptProperty_('PILOT_BROWSER_LOGIN_CODE_SHA256', '') ||
+      '07ef0098e3dac5a4441d16e18234eb3ab1c669e384181a342739b9821acd5e95'
+    ).trim().toLowerCase();
+  }
+  return String(getScriptProperty_('DEFAULT_LOGIN_PASSWORD_SHA256', '') || '').trim().toLowerCase();
+}
+
+function setPilotOwnerPasswordHash(password) {
+  const value = String(password || '');
+  if (!value || value.length < 8) throw new Error('Password owner minimal 8 karakter.');
+  PropertiesService.getScriptProperties().setProperty('PILOT_OWNER_PASSWORD_SHA256', sha256Hex_(value));
+  return { ok: true, property: 'PILOT_OWNER_PASSWORD_SHA256', length: value.length };
+}
+
+function setDefaultLoginPasswordHash(password) {
+  const value = String(password || '');
+  if (!value || value.length < 8) throw new Error('Password default minimal 8 karakter.');
+  PropertiesService.getScriptProperties().setProperty('DEFAULT_LOGIN_PASSWORD_SHA256', sha256Hex_(value));
+  return { ok: true, property: 'DEFAULT_LOGIN_PASSWORD_SHA256', length: value.length };
 }
 
 function formatDateTimeForClient_(value) {
