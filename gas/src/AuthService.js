@@ -198,6 +198,78 @@ function deactivateUserAccessEntryForContext_(context, email) {
   });
 }
 
+function repairPilotOwnerUserAccess() {
+  const actor = getCurrentActor_();
+  const actorEmail = normalizeEmail_(actor && actor.userId);
+  const ownerEmail = normalizeEmail_(getScriptProperty_('PILOT_OWNER_EMAIL', ''));
+  if (!ownerEmail) throw new Error('PILOT_OWNER_EMAIL belum dikonfigurasi.');
+  if (!actorEmail || actorEmail !== ownerEmail) throw new Error('FORBIDDEN: hanya PILOT_OWNER_EMAIL yang boleh repair owner access.');
+  const tenantId = APP_CONFIG.defaultTenantId;
+  const clinicId = APP_CONFIG.defaultClinicId;
+  setActiveTenantContext_(tenantId);
+  assertTenantRegistryAllows_(tenantId);
+  return withTenantClinicLock_('repair_pilot_owner_access', tenantId, clinicId, function() {
+    ensurePhase1WarehouseSheetsNoLock_();
+    const now = new Date();
+    const rows = getRowsAsObjects_('USER_ACCESS');
+    let matched = 0;
+    let inserted = false;
+    let canonical = null;
+    rows.forEach(function(row) {
+      if (String(row.tenant_id || '') !== tenantId) return;
+      if (!userMatchesAccessRow_(ownerEmail, row)) return;
+      matched += 1;
+      if (!canonical || normalizeRole_(row.role) === 'owner' || String(row.status || 'active').toLowerCase() === 'active') {
+        canonical = row;
+      }
+    });
+    canonical = canonical || {};
+    const ownerRow = {
+      tenant_id: tenantId,
+      user_id: ownerEmail,
+      user_name: canonical.user_name || canonical.userName || 'Pilot Owner',
+      email: ownerEmail,
+      telegram_id: canonical.telegram_id || '',
+      whatsapp_id: canonical.whatsapp_id || '',
+      role: 'owner',
+      clinic_scope: canonical.clinic_scope || clinicId,
+      status: 'active',
+      last_login_at: canonical.last_login_at || '',
+      created_at: canonical.created_at || now,
+      updated_at: now,
+    };
+    const nextRows = [];
+    rows.forEach(function(row) {
+      const isTarget = String(row.tenant_id || '') === tenantId && userMatchesAccessRow_(ownerEmail, row);
+      if (!isTarget) {
+        nextRows.push(row);
+        return;
+      }
+      if (!inserted) {
+        nextRows.push(ownerRow);
+        inserted = true;
+      }
+    });
+    if (!inserted) nextRows.push(ownerRow);
+    replaceObjects_('USER_ACCESS', nextRows);
+    writeAudit_(ownerEmail, 'owner', 'pilot_owner_access_repair', 'USER_ACCESS', {
+      email: ownerEmail,
+      role: 'owner',
+      status: 'active',
+      matchedRows: matched,
+      removedDuplicateRows: Math.max(0, matched - 1),
+    });
+    const context = { actorId: ownerEmail, userEmail: ownerEmail, role: 'owner', tenantId: tenantId, clinicId: clinicId, source: 'PILOT_OWNER_EMAIL_REPAIR' };
+    const payload = getUserAccessPayloadForContext_(context);
+    payload.repair = {
+      ownerEmail: ownerEmail,
+      matchedRows: matched,
+      removedDuplicateRows: Math.max(0, matched - 1),
+    };
+    return payload;
+  });
+}
+
 function normalizeUserAccessInput_(context, entry) {
   const email = normalizeEmail_(entry.email || entry.userId || entry.user_id);
   if (!email) throw new Error('Email user wajib diisi.');

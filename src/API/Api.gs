@@ -8,6 +8,7 @@ function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
   const action = params.action;
   if (action === 'authState') return jsonOutput_(getDefaultAuthState());
+  if (action === 'userAccess') return jsonOutput_(getDefaultUserAccessPayload());
   if (action === 'health') return jsonOutput_(healthCheck());
   if (action === 'readiness') return jsonOutput_(readinessCheck());
   if (action === 'dashboardPayload') {
@@ -79,6 +80,17 @@ function doPost(e) {
     assertPilotMutationAllowed_(params, payload);
     const context = resolveRequestContext_(params, payload, 'finance');
     return jsonOutput_(deleteTransactionEntryForContext_(context, payload.type || params.type, payload.id || params.id));
+  }
+  if (action === 'userAccessSave') {
+    assertPilotMutationAllowed_(params, payload);
+    return jsonOutput_(saveDefaultUserAccessEntry(payload.entry || payload));
+  }
+  if (action === 'userAccessDeactivate') {
+    assertPilotMutationAllowed_(params, payload);
+    return jsonOutput_(deactivateDefaultUserAccessEntry(payload.email || params.email));
+  }
+  if (action === 'repairPilotOwnerAccess') {
+    return jsonOutput_(repairPilotOwnerUserAccess());
   }
   if (action === 'resetFixture') {
     assertPilotMutationAllowed_(params, payload);
