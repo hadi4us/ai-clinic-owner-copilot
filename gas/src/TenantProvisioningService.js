@@ -3,6 +3,95 @@ function getDefaultTenantAdminPayload() {
   return getTenantAdminPayloadForContext_(context);
 }
 
+function getDefaultClinicOnboardingPayload() {
+  const context = resolveRequestContext_({}, {}, 'viewer');
+  return getClinicOnboardingPayloadForContext_(context);
+}
+
+function getClinicOnboardingPayloadForContext_(context) {
+  assertTenantScope_(context.tenantId, context.clinicId);
+  setActiveTenantContext_(context.tenantId);
+  const tenantRow = getRowsAsObjects_('MASTER_TENANT')
+    .filter(function(row) { return String(row.tenant_id || '') === context.tenantId; })[0] || {};
+  const clinicRow = getRowsAsObjects_('MASTER_KLINIK')
+    .filter(function(row) {
+      return String(row.tenant_id || '') === context.tenantId && String(row.clinic_id || '') === context.clinicId;
+    })[0] || {};
+  const missingProfile = [];
+  if (!clinicRow.clinic_name) missingProfile.push('Nama klinik');
+  if (!clinicRow.city) missingProfile.push('Kota');
+  if (!clinicRow.clinic_type) missingProfile.push('Tipe klinik');
+  return {
+    ok: true,
+    tenantId: context.tenantId,
+    clinicId: context.clinicId,
+    tenantName: tenantRow.tenant_name || '',
+    ownerName: tenantRow.owner_name || '',
+    clinicName: clinicRow.clinic_name || '',
+    clinicType: clinicRow.clinic_type || 'pratama',
+    city: clinicRow.city || '',
+    addressSummary: clinicRow.address_summary || '',
+    status: clinicRow.status || tenantRow.status || '',
+    profileComplete: missingProfile.length === 0,
+    missingProfile: missingProfile,
+    canEditProfile: roleAllows_(context.role, 'owner'),
+    generatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
+  };
+}
+
+function updateDefaultClinicProfile(request) {
+  const context = resolveRequestContext_({}, {}, 'owner');
+  return updateClinicProfileForContext_(context, request || {});
+}
+
+function updateClinicProfileForContext_(context, request) {
+  assertTenantScope_(context.tenantId, context.clinicId);
+  if (!roleAllows_(context.role, 'owner')) throw new Error('FORBIDDEN: hanya owner/admin yang boleh mengubah profil klinik.');
+  const normalized = normalizeClinicProfileRequest_(request || {});
+  return withTenantClinicLock_('clinic_profile_update', context.tenantId, context.clinicId, function() {
+    const now = new Date();
+    const before = getRowsAsObjects_('MASTER_KLINIK').filter(function(row) {
+      return String(row.tenant_id || '') === context.tenantId && String(row.clinic_id || '') === context.clinicId;
+    })[0] || {};
+    replaceObjectsWhere_('MASTER_KLINIK', function(row) {
+      return String(row.tenant_id || '') === context.tenantId && String(row.clinic_id || '') === context.clinicId;
+    }, [{
+      tenant_id: context.tenantId,
+      clinic_id: context.clinicId,
+      clinic_name: normalized.clinicName,
+      clinic_type: normalized.clinicType,
+      city: normalized.city,
+      address_summary: normalized.addressSummary,
+      timezone: APP_CONFIG.timezone,
+      currency: 'IDR',
+      status: normalized.status,
+      created_at: before.created_at || now,
+      updated_at: now,
+    }]);
+    writeAudit_(context.userEmail || context.actorId || 'owner', context.role || 'owner', 'clinic_profile_update', 'MASTER_KLINIK', {
+      tenantId: context.tenantId,
+      clinicId: context.clinicId,
+      before: before,
+      after: normalized,
+    });
+    return getClinicOnboardingPayloadForContext_(context);
+  });
+}
+
+function normalizeClinicProfileRequest_(request) {
+  const clinicName = String(request.clinicName || request.clinic_name || '').trim();
+  if (!clinicName) throw new Error('Nama klinik wajib diisi.');
+  const status = String(request.status || 'active').trim().toLowerCase();
+  if (['trial', 'active', 'inactive'].indexOf(status) === -1) throw new Error('Status klinik harus trial, active, atau inactive.');
+  return {
+    clinicName: clinicName,
+    clinicType: String(request.clinicType || request.clinic_type || 'pratama').trim() || 'pratama',
+    city: String(request.city || '').trim(),
+    addressSummary: String(request.addressSummary || request.address_summary || '').trim(),
+    status: status,
+  };
+}
+
 function getTenantAdminPayloadForContext_(context) {
   assertTenantScope_(context.tenantId, context.clinicId);
   if (!roleAllows_(context.role, 'owner')) throw new Error('FORBIDDEN: hanya owner/admin yang boleh melihat tenant registry.');

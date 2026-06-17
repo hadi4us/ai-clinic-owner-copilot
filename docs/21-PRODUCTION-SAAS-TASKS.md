@@ -103,3 +103,11 @@ Status legend:
 - `[x]` Upload Data UI includes import history, KPI-style job counters, and validation/error notes.
 - `[ ]` Add trigger-backed chunk worker for large imports.
 - `[ ]` Add retry action for failed compute/import jobs.
+
+## Current Slice - Tenant Onboarding Wizard
+
+- `[x]` Dashboard now includes a 3-step onboarding wizard: Profil Klinik, Upload Data, Review Hasil.
+- `[x]` Current clinic profile can be read from `MASTER_KLINIK` and saved by owner/admin.
+- `[x]` Wizard progress is driven by profile completeness, dashboard data presence, data quality, and report readiness.
+- `[x]` Upload step links directly to template download and Upload Data.
+- `[x]` Review step points users to COA review or reports based on current state.

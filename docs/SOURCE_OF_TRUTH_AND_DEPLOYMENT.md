@@ -73,13 +73,13 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
 
 ## Current pilot deployment
 
-A versioned deployment was updated from the `hadi4us@gmail.com`-authorized clasp user on 2026-06-17.
+A versioned deployment was updated from the `hadi4us@gmail.com`-authorized clasp user on 2026-06-18.
 
 - Apps Script ID: `1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy`
-- Version: `62` — `Multi-tenant USER_ACCESS password match 2026-06-17`
+- Version: `65` — `Tenant onboarding wizard 2026-06-18`
 - Deployment ID: `AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag`
 - Web app URL: `https://script.google.com/macros/s/AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag/exec`
-- Readiness status: previous smoke test passed; latest deployment keeps tenant isolation and supports per-user USER_ACCESS password hashes in each tenant warehouse.
+- Readiness status: previous authenticated smoke test passed; latest terminal smoke was redirected to Google sign-in as expected for a login-required web app. Latest deployment keeps tenant isolation, per-user USER_ACCESS password hashes, and adds the tenant onboarding wizard.
 
 The previous versioned deployment under `ccc19depok@gmail.com` was undeployed and must not be used.
 
