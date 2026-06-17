@@ -103,9 +103,8 @@ function loginDefaultPasswordSession(username, password) {
   if (!providedPassword) throw new Error('Password wajib diisi.');
   const rows = getActiveUserAccessRowsForLogin_(normalizedUsername);
   if (!rows.length) throw new Error('FORBIDDEN: username belum terdaftar aktif di USER_ACCESS.');
-  const passwordHash = getPasswordLoginHashForAccessRow_(rows[0], normalizedUsername);
-  if (!passwordHash) throw new Error('PASSWORD_LOGIN_NOT_CONFIGURED: password login belum dikonfigurasi untuk akun ini.');
-  if (sha256Hex_(providedPassword) !== String(passwordHash).trim().toLowerCase()) throw new Error('Username atau password salah.');
+  if (!isPasswordLoginConfiguredForAccessRow_(rows[0], normalizedUsername)) throw new Error('PASSWORD_LOGIN_NOT_CONFIGURED: password login belum dikonfigurasi untuk akun ini.');
+  if (!passwordMatchesAccessRow_(rows[0], normalizedUsername, providedPassword)) throw new Error('Username atau password salah.');
   setBrowserSessionEmail_(temporaryUserKey, normalizedUsername);
   setActiveTenantContext_(rows[0].tenant_id || APP_CONFIG.defaultTenantId);
   writeAudit_(normalizedUsername, normalizeRole_(rows[0].role) || 'viewer', 'password_login', 'USER_ACCESS', {
@@ -193,6 +192,10 @@ function saveUserAccessEntryForContext_(context, entry) {
       row.role = normalized.role;
       row.clinic_scope = normalized.clinicScope;
       row.status = normalized.status;
+      if (normalized.passwordHash) row.password_hash = normalized.passwordHash;
+      row.login_password_hash = row.login_password_hash || '';
+      row.password = '';
+      row.login_password = '';
       row.updated_at = now;
       return row;
     });
@@ -210,6 +213,10 @@ function saveUserAccessEntryForContext_(context, entry) {
         last_login_at: '',
         created_at: now,
         updated_at: now,
+        password_hash: normalized.passwordHash || '',
+        login_password_hash: '',
+        password: '',
+        login_password: '',
       });
     }
     replaceObjects_('USER_ACCESS', nextRows);
@@ -331,6 +338,7 @@ function normalizeUserAccessInput_(context, entry) {
     role,
     clinicScope: String(entry.clinicScope || entry.clinic_scope || context.clinicId || APP_CONFIG.defaultClinicId).trim() || context.clinicId || APP_CONFIG.defaultClinicId,
     status,
+    passwordHash: normalizeUserAccessPasswordHash_(entry.password || entry.loginPassword || entry.login_password || '', entry.passwordHash || entry.password_hash || entry.loginPasswordHash || entry.login_password_hash || ''),
   };
 }
 
@@ -347,6 +355,7 @@ function normalizeUserAccessForClient_(row) {
     status: row.status || 'active',
     lastLoginAt: formatDateTimeForClient_(row.last_login_at),
     updatedAt: formatDateTimeForClient_(row.updated_at),
+    hasPassword: isPasswordLoginConfiguredForAccessRow_(row, row.email || row.user_id),
   };
 }
 
@@ -416,21 +425,36 @@ function normalizeEmail_(value) {
 }
 
 function getPasswordLoginHashForAccessRow_(row, username) {
-  const rowHash = String(row.password_hash || row.login_password_hash || '').trim().toLowerCase();
+  const rowHash = String(row.password_hash || row.login_password_hash || row.password_sha256 || row.login_password_sha256 || '').trim().toLowerCase();
   if (rowHash) return rowHash;
-  const defaultHash = String(getScriptProperty_('DEFAULT_LOGIN_PASSWORD_SHA256', '') || '').trim().toLowerCase();
-  if (defaultHash) return defaultHash;
-  const normalizedUsername = normalizeEmail_(username || row.email || row.user_id);
-  const ownerEmail = normalizeEmail_(getScriptProperty_('PILOT_OWNER_EMAIL', ''));
-  const pilotHash = String(
-    getScriptProperty_('PILOT_OWNER_PASSWORD_SHA256', '') ||
-    getScriptProperty_('PILOT_BROWSER_LOGIN_CODE_SHA256', '') ||
-    '07ef0098e3dac5a4441d16e18234eb3ab1c669e384181a342739b9821acd5e95'
-  ).trim().toLowerCase();
-  if (ownerEmail && normalizedUsername === ownerEmail) {
-    return pilotHash;
+  return '';
+}
+
+function isPasswordLoginConfiguredForAccessRow_(row, username) {
+  return !!(
+    getPasswordLoginHashForAccessRow_(row, username) ||
+    String(row.password || row.login_password || '').trim()
+  );
+}
+
+function passwordMatchesAccessRow_(row, username, providedPassword) {
+  const value = String(providedPassword || '');
+  const rowPlainPassword = String(row.password || row.login_password || '').trim();
+  if (rowPlainPassword && value === rowPlainPassword) return true;
+  const passwordHash = getPasswordLoginHashForAccessRow_(row, username);
+  return !!passwordHash && sha256Hex_(value) === String(passwordHash).trim().toLowerCase();
+}
+
+function normalizeUserAccessPasswordHash_(plainPassword, providedHash) {
+  const hash = String(providedHash || '').trim().toLowerCase();
+  if (hash) {
+    if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error('Password hash USER_ACCESS harus SHA-256 hex 64 karakter.');
+    return hash;
   }
-  return pilotHash;
+  const password = String(plainPassword || '');
+  if (!password) return '';
+  if (password.length < 8) throw new Error('Password USER_ACCESS minimal 8 karakter.');
+  return sha256Hex_(password);
 }
 
 function setPilotOwnerPasswordHash(password) {

@@ -37,7 +37,7 @@ const SHEET_SCHEMAS = Object.freeze({
 
   SYNC_LOG: ['tenant_id', 'clinic_id', 'sync_id', 'job_type', 'source_system', 'import_id', 'status', 'started_at', 'finished_at', 'rows_read', 'rows_written', 'rows_failed', 'error_message'],
   AUDIT_LOG: ['tenant_id', 'audit_id', 'user_id', 'action', 'target_sheet', 'target_id', 'before_json', 'after_json', 'ip_or_channel', 'created_at'],
-  USER_ACCESS: ['tenant_id', 'user_id', 'user_name', 'email', 'telegram_id', 'whatsapp_id', 'role', 'clinic_scope', 'status', 'last_login_at', 'created_at', 'updated_at'],
+  USER_ACCESS: ['tenant_id', 'user_id', 'user_name', 'email', 'telegram_id', 'whatsapp_id', 'role', 'clinic_scope', 'status', 'last_login_at', 'created_at', 'updated_at', 'password_hash', 'login_password_hash', 'password', 'login_password'],
   SETTINGS: ['tenant_id', 'clinic_id', 'setting_key', 'setting_value', 'setting_type', 'category', 'is_secret', 'updated_by', 'updated_at'],
 });
 

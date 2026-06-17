@@ -67,7 +67,7 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
   1. `PILOT_MUTATION_TOKEN` Script Property set.
   2. `PILOT_OWNER_EMAIL` Script Property set.
   3. Run setup once so `USER_ACCESS` contains the pilot owner.
-  4. Configure `DEFAULT_LOGIN_PASSWORD_SHA256` for pilot-wide USER_ACCESS password login, or temporarily keep the existing pilot owner/browser-code hash as the fallback during pilot smoke.
+  4. Set per-user password from the dashboard `Akun & Akses` form, which writes `password_hash` in each tenant's `USER_ACCESS`. Manual sheet edits may use `password_hash` / `login_password_hash`; temporary plaintext `password` / `login_password` columns are accepted for pilot recovery but should be cleared after hashing.
   5. Warehouse schema exists and KPI data is available via fixture or import+compute.
 - `WAREHOUSE_SPREADSHEET_ID` Script Property is required for pilot deployment. No fallback spreadsheet ID is approved while migrating away from old `ccc19depok@gmail.com` resources.
 
@@ -76,10 +76,10 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
 A versioned deployment was updated from the `hadi4us@gmail.com`-authorized clasp user on 2026-06-17.
 
 - Apps Script ID: `1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy`
-- Version: `59` — `Pilot login shared password fallback 2026-06-17`
+- Version: `61` — `USER_ACCESS sheet password login 2026-06-17`
 - Deployment ID: `AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag`
 - Web app URL: `https://script.google.com/macros/s/AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag/exec`
-- Readiness status: previous smoke test passed; latest deployment keeps tenant isolation and lets every active USER_ACCESS account use the configured default/pilot password fallback until per-user password hashes are provisioned.
+- Readiness status: previous smoke test passed; latest deployment keeps tenant isolation and supports per-user USER_ACCESS password hashes in each tenant warehouse.
 
 The previous versioned deployment under `ccc19depok@gmail.com` was undeployed and must not be used.
 
