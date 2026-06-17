@@ -65,6 +65,11 @@ function getManifestWebAccess_() {
   return 'ANYONE';
 }
 
+function getManifestWebExecuteAs_() {
+  // Keep in sync with appsscript.json. Apps Script cannot read manifest directly at runtime.
+  return 'USER_ACCESSING';
+}
+
 function maskId_(value) {
   const s = String(value || '');
   if (s.length <= 12) return s ? '***' : '';

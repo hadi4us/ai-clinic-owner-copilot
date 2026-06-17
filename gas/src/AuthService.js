@@ -10,9 +10,29 @@ function getCurrentActor_() {
   let temporaryUserKey = '';
   try { temporaryUserKey = String(Session.getTemporaryActiveUserKey() || '').trim(); } catch (err) { temporaryUserKey = ''; }
   const boundEmail = !email && temporaryUserKey ? getBrowserSessionEmail_(temporaryUserKey) : '';
-  // Security note: never fall back to effectiveEmail as actor. For web apps executing as deployer,
-  // effectiveEmail is the deployer and would turn every visitor into the deployer.
-  return { userId: email || boundEmail, email: email || boundEmail, effectiveEmail, temporaryUserKey, channel: 'gas_webapp' };
+  const effectiveFallbackEmail = !email && !boundEmail ? getTrustedEffectiveUserEmail_(effectiveEmail) : '';
+  return {
+    userId: email || boundEmail || effectiveFallbackEmail,
+    email: email || boundEmail || effectiveFallbackEmail,
+    effectiveEmail,
+    temporaryUserKey,
+    actorSource: email ? 'active_user' : (boundEmail ? 'browser_binding' : (effectiveFallbackEmail ? 'effective_user_accessing' : 'none')),
+    channel: 'gas_webapp'
+  };
+}
+
+function getTrustedEffectiveUserEmail_(effectiveEmail) {
+  const normalized = String(effectiveEmail || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (getManifestWebExecuteAs_() !== 'USER_ACCESSING') return '';
+  try {
+    const ownerEmail = String(getScriptProperty_('PILOT_OWNER_EMAIL', '') || '').trim().toLowerCase();
+    if (ownerEmail && normalized === ownerEmail) return normalized;
+    const rows = getRowsAsObjects_('USER_ACCESS').filter(row => userMatchesAccessRow_(normalized, row) && String(row.status || 'active').toLowerCase() === 'active');
+    return rows.length ? normalized : '';
+  } catch (err) {
+    return '';
+  }
 }
 
 function resolveRequestContext_(params, payload, requiredRole) {
@@ -58,6 +78,7 @@ function getDefaultAuthState() {
     email: primary.email || userId,
     userName: primary.userName || userId,
     effectiveEmail: actor.effectiveEmail || '',
+    actorSource: actor.actorSource || '',
     tenantId: primary.tenantId,
     clinicId: primary.clinicId,
     clinicScope: primary.clinicScope,
