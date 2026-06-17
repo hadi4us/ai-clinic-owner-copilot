@@ -214,7 +214,7 @@ assertIncludes('gas/src/Dashboard.html', [
   'view-growth',
   'loadGrowthAssistant',
   'renderGrowthCampaigns',
-  'Growth Klinik',
+  'Peluang Kunjungan Ulang',
 ]);
 
 assertIncludes('gas/src/TenantProvisioningService.js', [
@@ -227,7 +227,7 @@ assertIncludes('gas/src/TenantProvisioningService.js', [
 ]);
 
 assertIncludes('gas/src/Dashboard.html', [
-  'Tenant Provisioning',
+  'Buat Klinik Baru',
   'tenantRegistryRows',
   'provisionTenant()',
   'Riwayat Import',
