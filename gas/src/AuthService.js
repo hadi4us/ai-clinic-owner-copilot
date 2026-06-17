@@ -9,13 +9,16 @@ function getCurrentActor_() {
   try { effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase(); } catch (err) { effectiveEmail = ''; }
   let temporaryUserKey = '';
   try { temporaryUserKey = String(Session.getTemporaryActiveUserKey() || '').trim(); } catch (err) { temporaryUserKey = ''; }
-  const boundEmail = temporaryUserKey ? getBrowserSessionEmail_(temporaryUserKey) : '';
+  const browserSession = temporaryUserKey ? getBrowserSessionAuth_(temporaryUserKey) : {};
+  const boundEmail = browserSession.email || '';
   const effectiveFallbackEmail = !boundEmail && !email ? getTrustedEffectiveUserEmail_(effectiveEmail) : '';
   return {
     userId: boundEmail || email || effectiveFallbackEmail,
     email: boundEmail || email || effectiveFallbackEmail,
     effectiveEmail,
     temporaryUserKey,
+    sessionTenantId: browserSession.tenantId || '',
+    sessionClinicId: browserSession.clinicId || '',
     actorSource: boundEmail ? 'password_session' : (email ? 'active_user' : (effectiveFallbackEmail ? 'effective_user_accessing' : 'none')),
     channel: 'gas_webapp'
   };
@@ -71,7 +74,7 @@ function getDefaultAuthState() {
       email: row.email || userId,
     };
   });
-  const primary = contexts[0];
+  const primary = selectPrimaryAuthContext_(contexts, actor);
   updateLastLoginForUser_(userId);
   if (primary && primary.tenantId) setActiveTenantContext_(primary.tenantId);
   return {
@@ -111,11 +114,18 @@ function loginDefaultPasswordSession(username, password) {
     return passwordMatchesAccessRow_(row, normalizedUsername, providedPassword);
   });
   if (!matchedRow) throw new Error('Username atau password salah.');
-  setBrowserSessionEmail_(temporaryUserKey, normalizedUsername);
-  setActiveTenantContext_(matchedRow.tenant_id || APP_CONFIG.defaultTenantId);
+  const matchedTenantId = matchedRow.tenant_id || APP_CONFIG.defaultTenantId;
+  const matchedClinicId = resolveDefaultClinicForTenant_([matchedRow], matchedTenantId) || matchedRow.clinic_scope || APP_CONFIG.defaultClinicId;
+  setBrowserSessionAuth_(temporaryUserKey, {
+    email: normalizedUsername,
+    tenantId: matchedTenantId,
+    clinicId: matchedClinicId,
+  });
+  setActiveTenantContext_(matchedTenantId);
   writeAudit_(normalizedUsername, normalizeRole_(matchedRow.role) || 'viewer', 'password_login', 'USER_ACCESS', {
     email: normalizedUsername,
-    tenantId: matchedRow.tenant_id || '',
+    tenantId: matchedTenantId,
+    clinicId: matchedClinicId,
     source: 'password_session',
   });
   return getDefaultAuthState();
@@ -133,7 +143,18 @@ function bindDefaultBrowserSession(email, code) {
   if (sha256Hex_(providedCode) !== String(expectedHash).trim().toLowerCase()) throw new Error('Kode login pilot salah.');
   const rows = getActiveUserAccessRowsForLogin_(normalizedEmail);
   if (!rows.length) throw new Error('FORBIDDEN: email belum terdaftar aktif di USER_ACCESS.');
-  setBrowserSessionEmail_(temporaryUserKey, normalizedEmail);
+  const primary = selectPrimaryAuthContext_(rows.map(function(row) {
+    return {
+      tenantId: row.tenant_id || '',
+      clinicId: resolveDefaultClinicForTenant_([row], row.tenant_id || '') || row.clinic_scope || '',
+      clinicScope: row.clinic_scope || '',
+    };
+  }), actor);
+  setBrowserSessionAuth_(temporaryUserKey, {
+    email: normalizedEmail,
+    tenantId: primary && primary.tenantId ? primary.tenantId : '',
+    clinicId: primary && primary.clinicId ? primary.clinicId : '',
+  });
   return getDefaultAuthState();
 }
 
@@ -488,12 +509,46 @@ function getBrowserSessionEmail_(temporaryUserKey) {
   return getScriptProperty_('BROWSER_SESSION_EMAIL_' + hashBrowserSessionKey_(temporaryUserKey), '');
 }
 
+function getBrowserSessionAuth_(temporaryUserKey) {
+  if (!temporaryUserKey) return {};
+  const key = hashBrowserSessionKey_(temporaryUserKey);
+  const raw = getScriptProperty_('BROWSER_SESSION_AUTH_' + key, '');
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        email: normalizeEmail_(parsed.email),
+        tenantId: String(parsed.tenantId || parsed.tenant_id || '').trim(),
+        clinicId: String(parsed.clinicId || parsed.clinic_id || '').trim(),
+      };
+    } catch (err) {}
+  }
+  const legacyEmail = getScriptProperty_('BROWSER_SESSION_EMAIL_' + key, '');
+  return legacyEmail ? { email: normalizeEmail_(legacyEmail), tenantId: '', clinicId: '' } : {};
+}
+
 function setBrowserSessionEmail_(temporaryUserKey, email) {
   PropertiesService.getScriptProperties().setProperty('BROWSER_SESSION_EMAIL_' + hashBrowserSessionKey_(temporaryUserKey), String(email || '').trim().toLowerCase());
 }
 
+function setBrowserSessionAuth_(temporaryUserKey, session) {
+  if (!temporaryUserKey) return;
+  const key = hashBrowserSessionKey_(temporaryUserKey);
+  const payload = {
+    email: normalizeEmail_(session && session.email),
+    tenantId: String(session && session.tenantId || '').trim(),
+    clinicId: String(session && session.clinicId || '').trim(),
+  };
+  PropertiesService.getScriptProperties().setProperty('BROWSER_SESSION_AUTH_' + key, JSON.stringify(payload));
+  if (payload.email) setBrowserSessionEmail_(temporaryUserKey, payload.email);
+}
+
 function clearBrowserSessionEmail_(temporaryUserKey) {
-  try { PropertiesService.getScriptProperties().deleteProperty('BROWSER_SESSION_EMAIL_' + hashBrowserSessionKey_(temporaryUserKey)); } catch (err) {}
+  try {
+    const key = hashBrowserSessionKey_(temporaryUserKey);
+    PropertiesService.getScriptProperties().deleteProperty('BROWSER_SESSION_EMAIL_' + key);
+    PropertiesService.getScriptProperties().deleteProperty('BROWSER_SESSION_AUTH_' + key);
+  } catch (err) {}
 }
 
 function hashBrowserSessionKey_(temporaryUserKey) {
@@ -521,13 +576,15 @@ function requireClinicAccess_(actor, requestedTenantId, requestedClinicId, requi
   if (!accessRows.length) throw new Error('FORBIDDEN: user belum terdaftar di USER_ACCESS.');
   const allowedRows = accessRows.filter(row => roleAllows_(row.role, requiredRole || 'owner'));
   if (!allowedRows.length) throw new Error('FORBIDDEN: role user tidak cukup untuk action ini.');
-  const tenantId = requestedTenantId || allowedRows[0].tenant_id;
+  const sessionTenantId = actor && actor.sessionTenantId ? String(actor.sessionTenantId).trim() : '';
+  const sessionClinicId = actor && actor.sessionClinicId ? String(actor.sessionClinicId).trim() : '';
+  const tenantId = requestedTenantId || sessionTenantId || allowedRows[0].tenant_id;
   setActiveTenantContext_(tenantId);
   assertTenantRegistryAllows_(tenantId);
   if (!tenantId) throw new Error('FORBIDDEN: tenant context tidak tersedia.');
   const tenantRows = allowedRows.filter(row => row.tenant_id === tenantId);
   if (!tenantRows.length) throw new Error('FORBIDDEN: actor tidak boleh mengakses tenant ini.');
-  const clinicId = requestedClinicId || resolveDefaultClinicForTenant_(tenantRows, tenantId);
+  const clinicId = requestedClinicId || sessionClinicId || resolveDefaultClinicForTenant_(tenantRows, tenantId);
   if (!clinicId) throw new Error('FORBIDDEN: clinic context tidak tersedia.');
   const clinicRows = tenantRows.filter(row => clinicScopeAllows_(row.clinic_scope, clinicId));
   if (!clinicRows.length) throw new Error('FORBIDDEN: actor tidak boleh mengakses clinic ini.');
@@ -561,6 +618,23 @@ function clinicScopeAllows_(clinicScope, clinicId) {
   const scope = String(clinicScope || '').trim();
   if (!scope || scope === '*') return true;
   return scope.split(',').map(item => item.trim()).indexOf(clinicId) !== -1;
+}
+
+function selectPrimaryAuthContext_(contexts, actor) {
+  const rows = contexts || [];
+  const sessionTenantId = actor && actor.sessionTenantId ? String(actor.sessionTenantId).trim() : '';
+  const sessionClinicId = actor && actor.sessionClinicId ? String(actor.sessionClinicId).trim() : '';
+  if (sessionTenantId) {
+    const exact = rows.find(function(row) {
+      return row.tenantId === sessionTenantId && (!sessionClinicId || row.clinicId === sessionClinicId || clinicScopeAllows_(row.clinicScope, sessionClinicId));
+    });
+    if (exact) return exact;
+    const tenantOnly = rows.find(function(row) {
+      return row.tenantId === sessionTenantId;
+    });
+    if (tenantOnly) return tenantOnly;
+  }
+  return rows[0] || {};
 }
 
 function resolveDefaultClinicForTenant_(rows, tenantId) {
