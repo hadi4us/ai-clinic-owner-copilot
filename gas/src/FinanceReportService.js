@@ -8,7 +8,7 @@ function getFinancialReportPayload(tenantId, clinicId, period) {
   const taxes = getScopedPeriodRows_('PAJAK', tenantId, clinicId, ['tax_period', 'created_at'], period);
   const bpjsClaims = getScopedPeriodRows_('BPJS_KLAIM', tenantId, clinicId, ['service_month', 'claim_period', 'claim_date'], period);
   const inventoryRows = getScopedPeriodRows_('PERSEDIAAN', tenantId, clinicId, 'stock_date', period);
-  const coaRows = getRowsAsObjects_('MASTER_COA').filter(r => String(r.tenant_id || '') === tenantId && String(r.status || 'active').toLowerCase() !== 'inactive');
+  const coaRows = getRowsAsObjectsForTenant_('MASTER_COA', tenantId).filter(r => String(r.tenant_id || '') === tenantId && String(r.status || 'active').toLowerCase() !== 'inactive');
   const totalRevenue = sumByField_(revenues, 'net_amount');
   const receivable = sumByField_(revenues, 'receivable_amount');
   const bpjsReceivable = sumByField_(bpjsClaims, 'outstanding_amount');

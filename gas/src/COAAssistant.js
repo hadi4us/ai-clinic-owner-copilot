@@ -59,12 +59,12 @@ function normalizeCoaCandidateInput_(entry) {
 }
 
 function getActiveCoaAccounts_(tenantId) {
-  return getRowsAsObjects_('MASTER_COA')
+  return getRowsAsObjectsForTenant_('MASTER_COA', tenantId)
     .filter(row => String(row.tenant_id || '') === tenantId && String(row.status || 'active').toLowerCase() !== 'inactive');
 }
 
 function getCoaMappingRules_(context) {
-  return getRowsAsObjects_('COA_MAPPING_RULE')
+  return getRowsAsObjectsForTenant_('COA_MAPPING_RULE', context.tenantId)
     .filter(row => row.tenant_id === context.tenantId && (row.clinic_id === context.clinicId || row.clinic_id === '*' || row.clinic_id === '') && String(row.status || 'active').toLowerCase() === 'active');
 }
 

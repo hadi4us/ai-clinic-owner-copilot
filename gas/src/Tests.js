@@ -91,11 +91,13 @@ function testTenantRegistryStatic() {
   if (configSource.indexOf('TENANT_REGISTRY_JSON') === -1) throw new Error('Tenant registry must use TENANT_REGISTRY_JSON.');
   if (configSource.indexOf('warehouseSpreadsheetId') === -1) throw new Error('Tenant registry must expose warehouseSpreadsheetId.');
   if (configSource.indexOf('TENANT_NOT_REGISTERED') === -1) throw new Error('Tenant registry must reject unknown tenants.');
-  const sheetSource = getFunctionSourceText_('getWarehouseSpreadsheet_') + getFunctionSourceText_('setActiveTenantContext_');
+  const sheetSource = getFunctionSourceText_('getWarehouseSpreadsheet_') + getFunctionSourceText_('setActiveTenantContext_') + getFunctionSourceText_('getSheetRowsCacheKey_') + getFunctionSourceText_('withTenantClinicLock_');
   if (sheetSource.indexOf('getActiveTenantId_') === -1) throw new Error('Warehouse resolver must use active tenant context.');
-  if (sheetSource.indexOf('invalidateSheetRowsCache_') === -1) throw new Error('Tenant switch must invalidate row caches.');
-  const authSource = getFunctionSourceText_('resolveRequestContext_') + getFunctionSourceText_('requireClinicAccess_');
+  if (sheetSource.indexOf('getSheetRowsCacheKey_') === -1) throw new Error('Row cache must be tenant/spreadsheet-aware.');
+  if (sheetSource.indexOf('setActiveTenantContext_(tenantId)') === -1) throw new Error('Tenant lock must activate tenant context before writes.');
+  const authSource = getFunctionSourceText_('resolveRequestContext_') + getFunctionSourceText_('requireClinicAccess_') + getFunctionSourceText_('getActiveUserAccessRowsForLogin_');
   if (authSource.indexOf('assertTenantRegistryAllows_') === -1) throw new Error('Auth context must validate tenant registry.');
+  if (authSource.indexOf('getRowsAsObjectsForTenant_') === -1) throw new Error('Auth must look up USER_ACCESS inside each tenant warehouse.');
   return { ok: true };
 }
 

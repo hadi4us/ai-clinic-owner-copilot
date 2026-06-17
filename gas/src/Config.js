@@ -37,7 +37,8 @@ function getConfiguredSpreadsheetId_(tenantId) {
   const resolvedTenantId = String(tenantId || getActiveTenantId_() || APP_CONFIG.defaultTenantId).trim();
   const registryEntry = getTenantRegistryEntry_(resolvedTenantId);
   if (registryEntry && registryEntry.warehouseSpreadsheetId) return registryEntry.warehouseSpreadsheetId;
-  return getScriptProperty_('WAREHOUSE_SPREADSHEET_ID', APP_CONFIG.spreadsheetId);
+  if (resolvedTenantId === APP_CONFIG.defaultTenantId) return getScriptProperty_('WAREHOUSE_SPREADSHEET_ID', APP_CONFIG.spreadsheetId);
+  return '';
 }
 
 function getTenantRegistry_() {

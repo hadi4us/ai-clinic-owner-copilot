@@ -88,17 +88,17 @@ function getDefaultManualInputOptions() {
   if (cached) return cached;
   ensurePhase1WarehouseSheetsNoLock_();
   const active = row => String(row.status || 'active').toLowerCase() !== 'inactive';
-  const doctors = getRowsAsObjects_('MASTER_DOKTER')
+  const doctors = getRowsAsObjectsForTenant_('MASTER_DOKTER', context.tenantId)
     .filter(row => inScope_(row, context.tenantId, context.clinicId) && active(row))
     .map(row => ({ value: row.doctor_id || normalizeDoctorId_(row.doctor_name), label: row.doctor_name || row.doctor_id, meta: row.specialty || '' }));
-  const polis = getRowsAsObjects_('MASTER_POLI')
+  const polis = getRowsAsObjectsForTenant_('MASTER_POLI', context.tenantId)
     .filter(row => inScope_(row, context.tenantId, context.clinicId) && active(row))
     .map(row => ({ value: row.poli_id || normalizePoliId_(row.poli_name), label: row.poli_name || row.poli_id }));
-  const medicines = getRowsAsObjects_('MASTER_OBAT')
+  const medicines = getRowsAsObjectsForTenant_('MASTER_OBAT', context.tenantId)
     .filter(row => inScope_(row, context.tenantId, context.clinicId) && active(row))
     .slice(0, 300)
     .map(row => ({ value: row.medicine_id || row.medicine_name, label: row.medicine_name || row.medicine_id, meta: row.unit || '' }));
-  const coa = getRowsAsObjects_('MASTER_COA')
+  const coa = getRowsAsObjectsForTenant_('MASTER_COA', context.tenantId)
     .filter(row => row.tenant_id === context.tenantId && active(row))
     .map(row => ({ value: row.account_id || row.account_code, label: [row.account_code, row.account_name].filter(Boolean).join(' - '), meta: row.account_type || '' }));
   const payload = {

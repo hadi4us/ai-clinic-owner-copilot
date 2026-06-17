@@ -26,7 +26,8 @@ The root `src/` tree is a clean architecture mirror/reference. Do not edit root 
 
 - Public `GET` is read-only except dashboard rendering and health/dashboard payload.
 - Mutating actions (`setup`, `compute`, `resetFixture`, `upload`) are POST-only for API calls and require `PILOT_MUTATION_TOKEN` when called through `doPost`.
-- Dashboard/API data calls resolve tenant/clinic from `USER_ACCESS`. The web UI now uses username/password session binding first because consumer Gmail can fail to expose a stable Apps Script user email; Google active/effective user remains a compatibility fallback. Query/body `tenantId` and `clinicId` are only selectors after `requireClinicAccess_` passes.
+- Dashboard/API data calls resolve tenant/clinic from `USER_ACCESS` inside each registered tenant warehouse. The web UI uses username/password session binding first because consumer Gmail can fail to expose a stable Apps Script user email; Google active/effective user remains a compatibility fallback. Query/body `tenantId` and `clinicId` are only selectors after `requireClinicAccess_` passes.
+- Row caches are tenant/spreadsheet-aware. Cache keys must include active tenant + warehouse spreadsheet id so data read from one tenant cannot be reused for another tenant.
 - Dashboard internal `google.script.run.uploadPocFile` also resolves the same verified session context before import.
 - Unknown users and cross-tenant requests are denied. `Session.getEffectiveUser()` is only accepted as a guarded compatibility fallback when the manifest is `executeAs: USER_ACCESSING` and the effective email is the pilot owner or an active `USER_ACCESS` row.
 - Bootstrap setup is the only token-only mutating action because it may need to create initial `USER_ACCESS` from Script Property `PILOT_OWNER_EMAIL`. After setup, data/dashboard/import/compute/reset require verified session access.
@@ -75,10 +76,10 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
 A versioned deployment was updated from the `hadi4us@gmail.com`-authorized clasp user on 2026-06-17.
 
 - Apps Script ID: `1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy`
-- Version: `57` — `Username password login slice 2026-06-17`
+- Version: `58` — `Tenant warehouse isolation hardening 2026-06-17`
 - Deployment ID: `AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag`
 - Web app URL: `https://script.google.com/macros/s/AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag/exec`
-- Readiness status: previous authenticated smoke test passed as `hadi4us@gmail.com`; latest deployment adds USER_ACCESS username/password login so the browser no longer depends on `Session.getActiveUser().getEmail()`.
+- Readiness status: previous smoke test passed; latest deployment hardens tenant warehouse isolation so non-default tenants cannot fall back to the master spreadsheet and row caches cannot cross tenants.
 
 The previous versioned deployment under `ccc19depok@gmail.com` was undeployed and must not be used.
 

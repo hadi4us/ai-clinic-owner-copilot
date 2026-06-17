@@ -28,7 +28,7 @@ function getTrustedEffectiveUserEmail_(effectiveEmail) {
   try {
     const ownerEmail = String(getScriptProperty_('PILOT_OWNER_EMAIL', '') || '').trim().toLowerCase();
     if (ownerEmail && normalized === ownerEmail) return normalized;
-    const rows = getRowsAsObjects_('USER_ACCESS').filter(row => userMatchesAccessRow_(normalized, row) && String(row.status || 'active').toLowerCase() === 'active');
+    const rows = getActiveUserAccessRowsForLogin_(normalized);
     return rows.length ? normalized : '';
   } catch (err) {
     return '';
@@ -55,7 +55,7 @@ function getDefaultAuthState() {
     error: 'UNAUTHENTICATED',
     message: 'Masuk dengan username dan password untuk mencocokkan akun di USER_ACCESS.'
   };
-  const rows = getRowsAsObjects_('USER_ACCESS').filter(row => userMatchesAccessRow_(userId, row) && String(row.status || 'active').toLowerCase() === 'active');
+  const rows = getActiveUserAccessRowsForLogin_(userId);
   if (!rows.length) return { ok: false, authenticated: true, authorized: false, email: userId, effectiveEmail: actor.effectiveEmail || '', requiresPasswordLogin: true, error: 'FORBIDDEN', message: 'Akun ini belum terdaftar di USER_ACCESS. Masuk ulang dengan username yang benar.' };
   const contexts = rows.map(row => {
     const role = normalizeRole_(row.role);
@@ -72,6 +72,7 @@ function getDefaultAuthState() {
   });
   const primary = contexts[0];
   updateLastLoginForUser_(userId);
+  if (primary && primary.tenantId) setActiveTenantContext_(primary.tenantId);
   return {
     ok: true,
     authenticated: true,
@@ -99,14 +100,13 @@ function loginDefaultPasswordSession(username, password) {
   if (!normalizedUsername) throw new Error('Username wajib diisi.');
   const providedPassword = String(password || '');
   if (!providedPassword) throw new Error('Password wajib diisi.');
-  const rows = getRowsAsObjects_('USER_ACCESS').filter(function(row) {
-    return userMatchesAccessRow_(normalizedUsername, row) && String(row.status || 'active').toLowerCase() === 'active';
-  });
+  const rows = getActiveUserAccessRowsForLogin_(normalizedUsername);
   if (!rows.length) throw new Error('FORBIDDEN: username belum terdaftar aktif di USER_ACCESS.');
   const passwordHash = getPasswordLoginHashForAccessRow_(rows[0], normalizedUsername);
   if (!passwordHash) throw new Error('PASSWORD_LOGIN_NOT_CONFIGURED: password login belum dikonfigurasi untuk akun ini.');
   if (sha256Hex_(providedPassword) !== String(passwordHash).trim().toLowerCase()) throw new Error('Username atau password salah.');
   setBrowserSessionEmail_(temporaryUserKey, normalizedUsername);
+  setActiveTenantContext_(rows[0].tenant_id || APP_CONFIG.defaultTenantId);
   writeAudit_(normalizedUsername, normalizeRole_(rows[0].role) || 'viewer', 'password_login', 'USER_ACCESS', {
     email: normalizedUsername,
     source: 'password_session',
@@ -124,7 +124,7 @@ function bindDefaultBrowserSession(email, code) {
   const expectedHash = getScriptProperty_('PILOT_BROWSER_LOGIN_CODE_SHA256', '') || '07ef0098e3dac5a4441d16e18234eb3ab1c669e384181a342739b9821acd5e95';
   if (!expectedHash) throw new Error('PILOT_BROWSER_LOGIN_CODE_SHA256 belum dikonfigurasi.');
   if (sha256Hex_(providedCode) !== String(expectedHash).trim().toLowerCase()) throw new Error('Kode login pilot salah.');
-  const rows = getRowsAsObjects_('USER_ACCESS').filter(row => userMatchesAccessRow_(normalizedEmail, row) && String(row.status || 'active').toLowerCase() === 'active');
+  const rows = getActiveUserAccessRowsForLogin_(normalizedEmail);
   if (!rows.length) throw new Error('FORBIDDEN: email belum terdaftar aktif di USER_ACCESS.');
   setBrowserSessionEmail_(temporaryUserKey, normalizedEmail);
   return getDefaultAuthState();
@@ -143,6 +143,7 @@ function getDefaultUserAccessPayload() {
 
 function getUserAccessPayloadForContext_(context) {
   assertTenantScope_(context.tenantId, context.clinicId);
+  setActiveTenantContext_(context.tenantId);
   if (!roleAllows_(context.role, 'owner')) throw new Error('FORBIDDEN: hanya owner/admin yang boleh mengelola USER_ACCESS.');
   const rows = getRowsAsObjects_('USER_ACCESS')
     .filter(row => String(row.tenant_id || '') === context.tenantId)
@@ -359,6 +360,44 @@ function getUserAccessRoleOptions_() {
   ];
 }
 
+function getActiveUserAccessRowsForLogin_(userId) {
+  const normalized = normalizeEmail_(userId);
+  if (!normalized) return [];
+  const entries = getTenantRegistryEntriesForAuth_();
+  const rows = [];
+  const seen = {};
+  entries.forEach(function(entry) {
+    if (!entry || !entry.tenantId || !entry.warehouseSpreadsheetId) return;
+    if (entry.status !== 'active' && entry.status !== 'trial') return;
+    try {
+      getRowsAsObjectsForTenant_('USER_ACCESS', entry.tenantId)
+        .filter(function(row) {
+          return userMatchesAccessRow_(normalized, row) && String(row.status || 'active').toLowerCase() === 'active';
+        })
+        .forEach(function(row) {
+          const key = [row.tenant_id || entry.tenantId, row.email || row.user_id || normalized, row.role || '', row.clinic_scope || ''].join('|');
+          if (seen[key]) return;
+          seen[key] = true;
+          row.tenant_id = row.tenant_id || entry.tenantId;
+          rows.push(row);
+        });
+    } catch (err) {
+      // A broken tenant warehouse must not leak another tenant's USER_ACCESS rows.
+    }
+  });
+  return rows.sort(function(a, b) {
+    return String(a.tenant_id || '').localeCompare(String(b.tenant_id || '')) ||
+      String(a.email || a.user_id || '').localeCompare(String(b.email || b.user_id || ''));
+  });
+}
+
+function getTenantRegistryEntriesForAuth_() {
+  const tenants = getTenantRegistry_();
+  return Object.keys(tenants).sort().map(function(tenantId) {
+    return getTenantRegistryEntry_(tenantId);
+  }).filter(Boolean);
+}
+
 function normalizeEmail_(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -431,7 +470,7 @@ function requireClinicAccess_(actor, requestedTenantId, requestedClinicId, requi
   const userId = actor && actor.userId ? String(actor.userId).trim().toLowerCase() : '';
   if (!userId) throw new Error('UNAUTHENTICATED: Google session tidak terdeteksi. Gunakan akses web app terbatas, bukan anonymous, untuk data pilot.');
   if (requestedTenantId) assertTenantRegistryAllows_(requestedTenantId);
-  const accessRows = getRowsAsObjects_('USER_ACCESS').filter(row => userMatchesAccessRow_(userId, row) && String(row.status || 'active').toLowerCase() === 'active');
+  const accessRows = getActiveUserAccessRowsForLogin_(userId);
   if (!accessRows.length) throw new Error('FORBIDDEN: user belum terdaftar di USER_ACCESS.');
   const allowedRows = accessRows.filter(row => roleAllows_(row.role, requiredRole || 'owner'));
   if (!allowedRows.length) throw new Error('FORBIDDEN: role user tidak cukup untuk action ini.');
@@ -513,10 +552,21 @@ function roleLabel_(role) {
 function updateLastLoginForUser_(userId) {
   try {
     const now = new Date();
-    updateObjectsWhere_('USER_ACCESS', row => userMatchesAccessRow_(userId, row), row => {
-      row.last_login_at = now;
-      row.updated_at = now;
-      return row;
+    getTenantRegistryEntriesForAuth_().forEach(function(entry) {
+      if (!entry || !entry.tenantId || !entry.warehouseSpreadsheetId) return;
+      const previousTenantId = ACTIVE_TENANT_ID_;
+      try {
+        setActiveTenantContext_(entry.tenantId);
+        updateObjectsWhere_('USER_ACCESS', row => userMatchesAccessRow_(userId, row), row => {
+          row.last_login_at = now;
+          row.updated_at = now;
+          return row;
+        });
+      } catch (err) {
+        // Keep auth resilient if one tenant warehouse is temporarily unavailable.
+      } finally {
+        restoreActiveTenantContext_(previousTenantId);
+      }
     });
   } catch (err) {
     // Auth state must not fail just because audit metadata cannot be updated.

@@ -5,7 +5,6 @@ var ACTIVE_TENANT_ID_ = '';
 
 function setActiveTenantContext_(tenantId) {
   const nextTenantId = String(tenantId || APP_CONFIG.defaultTenantId).trim();
-  if (ACTIVE_TENANT_ID_ && ACTIVE_TENANT_ID_ !== nextTenantId) invalidateSheetRowsCache_();
   ACTIVE_TENANT_ID_ = nextTenantId || APP_CONFIG.defaultTenantId;
   return ACTIVE_TENANT_ID_;
 }
@@ -17,6 +16,7 @@ function getActiveTenantId_() {
 function getWarehouseSpreadsheet_() {
   const tenantId = getActiveTenantId_();
   const spreadsheetId = getConfiguredSpreadsheetId_(tenantId);
+  if (!spreadsheetId) throw new Error('TENANT_WAREHOUSE_MISSING: tenant ' + tenantId + ' belum punya warehouse spreadsheet id.');
   const cacheKey = [tenantId, spreadsheetId].join(':');
   if (!WAREHOUSE_SPREADSHEET_CACHE_[cacheKey]) {
     WAREHOUSE_SPREADSHEET_CACHE_[cacheKey] = SpreadsheetApp.openById(spreadsheetId);
@@ -101,11 +101,20 @@ function withDocumentLock_(operationName, callback) {
 }
 
 function withTenantClinicLock_(operationName, tenantId, clinicId, callback) {
-  return withDocumentLock_(`${operationName}:${tenantId || 'unknown'}:${clinicId || 'unknown'}`, callback);
+  return withDocumentLock_(`${operationName}:${tenantId || 'unknown'}:${clinicId || 'unknown'}`, function() {
+    const previousTenantId = ACTIVE_TENANT_ID_;
+    if (tenantId) setActiveTenantContext_(tenantId);
+    try {
+      return callback();
+    } finally {
+      restoreActiveTenantContext_(previousTenantId);
+    }
+  });
 }
 
 function getRowsAsObjects_(sheetName) {
-  if (SHEET_ROWS_CACHE_[sheetName]) return cloneRowsForRead_(SHEET_ROWS_CACHE_[sheetName]);
+  const cacheKey = getSheetRowsCacheKey_(sheetName);
+  if (SHEET_ROWS_CACHE_[cacheKey]) return cloneRowsForRead_(SHEET_ROWS_CACHE_[cacheKey]);
   const sheet = getWarehouseSpreadsheet_().getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() < 2) return [];
   const values = sheet.getDataRange().getValues();
@@ -116,12 +125,13 @@ function getRowsAsObjects_(sheetName) {
       if (header) obj[header] = row[index];
       return obj;
     }, {}));
-  SHEET_ROWS_CACHE_[sheetName] = rows;
+  SHEET_ROWS_CACHE_[cacheKey] = rows;
   return cloneRowsForRead_(rows);
 }
 
 function getScopedRows_(sheetName, tenantId, clinicId) {
-  const key = [sheetName, tenantId || '', clinicId || ''].join('|');
+  if (tenantId) setActiveTenantContext_(tenantId);
+  const key = [getSheetRowsCacheKey_(sheetName), tenantId || '', clinicId || ''].join('|');
   if (SHEET_SCOPE_ROWS_CACHE_[key]) return cloneRowsForRead_(SHEET_SCOPE_ROWS_CACHE_[key]);
   const rows = getRowsAsObjects_(sheetName).filter(row => inScope_(row, tenantId, clinicId));
   SHEET_SCOPE_ROWS_CACHE_[key] = rows;
@@ -132,7 +142,8 @@ function getScopedPeriodRows_(sheetName, tenantId, clinicId, dateFields, period)
   const fields = Array.isArray(dateFields) ? dateFields : [dateFields];
   const normalizedPeriod = String(period || '').slice(0, 7);
   if (!normalizedPeriod) return getScopedRows_(sheetName, tenantId, clinicId);
-  const key = [sheetName, tenantId || '', clinicId || '', fields.join(','), normalizedPeriod].join('|');
+  if (tenantId) setActiveTenantContext_(tenantId);
+  const key = [getSheetRowsCacheKey_(sheetName), tenantId || '', clinicId || '', fields.join(','), normalizedPeriod].join('|');
   if (SHEET_SCOPE_ROWS_CACHE_[key]) return cloneRowsForRead_(SHEET_SCOPE_ROWS_CACHE_[key]);
   const rows = getScopedRows_(sheetName, tenantId, clinicId).filter(function(row) {
     return fields.some(function(field) { return toPeriodString_(row[field]) === normalizedPeriod; });
@@ -145,15 +156,41 @@ function cloneRowsForRead_(rows) {
   return (rows || []).map(row => Object.assign({}, row));
 }
 
+function getSheetRowsCacheKey_(sheetName) {
+  const tenantId = getActiveTenantId_();
+  return [tenantId, getConfiguredSpreadsheetId_(tenantId), sheetName].join('|');
+}
+
+function getRowsAsObjectsForTenant_(sheetName, tenantId) {
+  const previousTenantId = ACTIVE_TENANT_ID_;
+  setActiveTenantContext_(tenantId);
+  try {
+    return getRowsAsObjects_(sheetName);
+  } finally {
+    restoreActiveTenantContext_(previousTenantId);
+  }
+}
+
+function restoreActiveTenantContext_(tenantId) {
+  const previous = String(tenantId || '').trim();
+  if (previous) {
+    setActiveTenantContext_(previous);
+    return;
+  }
+  ACTIVE_TENANT_ID_ = '';
+}
+
 function invalidateSheetRowsCache_(sheetName) {
   if (!sheetName) {
     SHEET_ROWS_CACHE_ = {};
     SHEET_SCOPE_ROWS_CACHE_ = {};
     return;
   }
-  delete SHEET_ROWS_CACHE_[sheetName];
+  Object.keys(SHEET_ROWS_CACHE_).forEach(function(key) {
+    if (key.split('|').pop() === sheetName) delete SHEET_ROWS_CACHE_[key];
+  });
   Object.keys(SHEET_SCOPE_ROWS_CACHE_).forEach(function(key) {
-    if (key.indexOf(sheetName + '|') === 0) delete SHEET_SCOPE_ROWS_CACHE_[key];
+    if (key.indexOf('|' + sheetName + '|') !== -1) delete SHEET_SCOPE_ROWS_CACHE_[key];
   });
 }
 
@@ -161,7 +198,7 @@ function ensurePhase1WarehouseSheetsNoLock_() {
   const spreadsheet = getWarehouseSpreadsheet_();
   getPhase1SheetNames_().forEach(sheetName => setHeader_(getOrCreateSheet_(spreadsheet, sheetName), getSheetSchema_(sheetName)));
   invalidateSheetRowsCache_();
-  seedPocConfig_();
+  if (getActiveTenantId_() === APP_CONFIG.defaultTenantId) seedPocConfig_();
   writeAudit_('system', 'system', 'setup_final_warehouse_sheets', 'spreadsheet_schema', { schemaVersion: APP_CONFIG.schemaVersion, sheetCount: getPhase1SheetNames_().length });
   return { ok: true, tenantId: getActiveTenantId_(), spreadsheetId: getConfiguredSpreadsheetId_(), schemaVersion: APP_CONFIG.schemaVersion, sheetsCreatedOrUpdated: getPhase1SheetNames_().length };
 }

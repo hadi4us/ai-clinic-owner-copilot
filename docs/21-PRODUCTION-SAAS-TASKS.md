@@ -29,6 +29,7 @@ Status legend:
 - `[x]` Add static guard for cross-tenant spreadsheet resolution.
 - `[x]` Add admin UI for tenant registry visibility.
 - `[x]` Add provisioning workflow to create registry entries.
+- `[x]` Harden row cache and writes so each tenant uses its own warehouse spreadsheet.
 
 ### P0.3 Tenant Provisioning
 
