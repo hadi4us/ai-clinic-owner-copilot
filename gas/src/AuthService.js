@@ -52,11 +52,12 @@ function getDefaultAuthState() {
     requiresBrowserLogin: true,
     requiresPasswordLogin: true,
     hasTemporaryUserKey: !!(actor && actor.temporaryUserKey),
+    suggestedUsername: getSuggestedLoginUsername_(actor),
     error: 'UNAUTHENTICATED',
     message: 'Masuk dengan username dan password untuk mencocokkan akun di USER_ACCESS.'
   };
   const rows = getActiveUserAccessRowsForLogin_(userId);
-  if (!rows.length) return { ok: false, authenticated: true, authorized: false, email: userId, effectiveEmail: actor.effectiveEmail || '', requiresPasswordLogin: true, error: 'FORBIDDEN', message: 'Akun ini belum terdaftar di USER_ACCESS. Masuk ulang dengan username yang benar.' };
+  if (!rows.length) return { ok: false, authenticated: true, authorized: false, email: userId, effectiveEmail: actor.effectiveEmail || '', requiresPasswordLogin: true, suggestedUsername: getSuggestedLoginUsername_(actor), error: 'FORBIDDEN', message: 'Akun ini belum terdaftar di USER_ACCESS. Masuk ulang dengan username yang benar.' };
   const contexts = rows.map(row => {
     const role = normalizeRole_(row.role);
     return {
@@ -398,6 +399,18 @@ function getTenantRegistryEntriesForAuth_() {
   }).filter(Boolean);
 }
 
+function getSuggestedLoginUsername_(actor) {
+  const candidates = [
+    actor && actor.email,
+    actor && actor.effectiveEmail,
+    getScriptProperty_('PILOT_OWNER_EMAIL', ''),
+  ].map(normalizeEmail_).filter(Boolean);
+  for (let i = 0; i < candidates.length; i += 1) {
+    if (getActiveUserAccessRowsForLogin_(candidates[i]).length) return candidates[i];
+  }
+  return candidates[0] || '';
+}
+
 function normalizeEmail_(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -405,16 +418,19 @@ function normalizeEmail_(value) {
 function getPasswordLoginHashForAccessRow_(row, username) {
   const rowHash = String(row.password_hash || row.login_password_hash || '').trim().toLowerCase();
   if (rowHash) return rowHash;
+  const defaultHash = String(getScriptProperty_('DEFAULT_LOGIN_PASSWORD_SHA256', '') || '').trim().toLowerCase();
+  if (defaultHash) return defaultHash;
   const normalizedUsername = normalizeEmail_(username || row.email || row.user_id);
   const ownerEmail = normalizeEmail_(getScriptProperty_('PILOT_OWNER_EMAIL', ''));
+  const pilotHash = String(
+    getScriptProperty_('PILOT_OWNER_PASSWORD_SHA256', '') ||
+    getScriptProperty_('PILOT_BROWSER_LOGIN_CODE_SHA256', '') ||
+    '07ef0098e3dac5a4441d16e18234eb3ab1c669e384181a342739b9821acd5e95'
+  ).trim().toLowerCase();
   if (ownerEmail && normalizedUsername === ownerEmail) {
-    return String(
-      getScriptProperty_('PILOT_OWNER_PASSWORD_SHA256', '') ||
-      getScriptProperty_('PILOT_BROWSER_LOGIN_CODE_SHA256', '') ||
-      '07ef0098e3dac5a4441d16e18234eb3ab1c669e384181a342739b9821acd5e95'
-    ).trim().toLowerCase();
+    return pilotHash;
   }
-  return String(getScriptProperty_('DEFAULT_LOGIN_PASSWORD_SHA256', '') || '').trim().toLowerCase();
+  return pilotHash;
 }
 
 function setPilotOwnerPasswordHash(password) {
