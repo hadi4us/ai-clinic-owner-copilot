@@ -10,6 +10,7 @@ function doGet(e) {
   if (action === 'authState') return jsonOutput_(getDefaultAuthState());
   if (action === 'userAccess') return jsonOutput_(getDefaultUserAccessPayload());
   if (action === 'tenantAdmin') return jsonOutput_(getDefaultTenantAdminPayload());
+  if (action === 'importJobs') return jsonOutput_(getDefaultImportJobPayload(params.limit || 10));
   if (action === 'health') return jsonOutput_(healthCheck());
   if (action === 'readiness') return jsonOutput_(readinessCheck());
   if (action === 'dashboardPayload') {

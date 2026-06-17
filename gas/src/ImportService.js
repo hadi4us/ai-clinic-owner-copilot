@@ -8,6 +8,35 @@ function uploadPocFile(base64Data, fileName, mimeType, options) {
   return uploadPocFileForContext_(context, base64Data, fileName, mimeType, options || {});
 }
 
+function getDefaultImportJobPayload(limit) {
+  const context = resolveRequestContext_({}, {}, 'finance');
+  return getImportJobPayloadForContext_(context, limit || 10);
+}
+
+function getImportJobPayloadForContext_(context, limit) {
+  const max = Math.max(1, Math.min(Number(limit || 10), 25));
+  const tenantId = context.tenantId;
+  const clinicId = context.clinicId;
+  const filesByImportId = indexLatestImportFiles_(tenantId, clinicId);
+  const syncByImportId = indexLatestSyncLogs_(tenantId, clinicId);
+  const validationSummary = summarizeValidationByImport_(tenantId, clinicId);
+  const batches = getScopedRows_('IMPORT_BATCH', tenantId, clinicId)
+    .sort(function(a, b) { return dateSortValue_(b.started_at || b.completed_at) - dateSortValue_(a.started_at || a.completed_at); })
+    .slice(0, max)
+    .map(function(batch) {
+      return buildImportJobRow_(batch, filesByImportId[batch.import_id], syncByImportId[batch.import_id], validationSummary[batch.import_id]);
+    });
+  return {
+    ok: true,
+    tenantId: tenantId,
+    clinicId: clinicId,
+    count: batches.length,
+    jobs: batches,
+    summary: summarizeImportJobs_(batches),
+    generatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
+  };
+}
+
 function uploadPocFileForContext_(context, base64Data, fileName, mimeType, options) {
   if (!base64Data) throw new Error('File kosong. Upload Excel/CSV terlebih dahulu.');
   const opts = Object.assign({}, options || {}, { tenantId: context.tenantId, clinicId: context.clinicId, actorId: context.actorId });
@@ -32,51 +61,26 @@ function importUploadedBlob_(blob, options) {
   return withTenantClinicLock_('import_uploaded_blob', tenantId, clinicId, function() {
   ensurePhase1WarehouseSheetsNoLock_();
   const now = new Date();
+  const sourceSystem = opts.sourceSystem || 'generic_excel';
   const duplicate = findCompletedImportByChecksum_(tenantId, clinicId, fileChecksum);
   if (duplicate && !opts.allowDuplicate) {
-    appendSyncLog_(tenantId, clinicId, importId, 'import', opts.sourceSystem || 'generic_excel', 'duplicate', now, new Date(), 0, 0, 0, 'Duplicate upload rejected: same checksum already imported as ' + duplicate.import_id);
-    return { ok: false, duplicate: true, importId, duplicateImportId: duplicate.import_id, rowsRead: 0, rowsWritten: 0, rowsFailed: 0, importedSheets: [], message: 'File duplicate. Upload ditolak agar KPI tidak double-count.' };
+    appendImportJobStart_(tenantId, clinicId, importId, sourceSystem, lowerName, opts, fileName, fileChecksum, now);
+    finalizeImportMetadata_(tenantId, clinicId, importId, 'duplicate', 'duplicate', 0, opts.period || '', fileChecksum);
+    appendSyncLog_(tenantId, clinicId, importId, 'import', sourceSystem, 'duplicate', now, new Date(), 0, 0, 0, 'Duplicate upload rejected: same checksum already imported as ' + duplicate.import_id);
+    writeAudit_(opts.actorId || 'dashboard_upload', 'finance', 'upload_duplicate_rejected', 'IMPORT_BATCH', { importId, duplicateImportId: duplicate.import_id, fileName });
+    return { ok: false, duplicate: true, importId, duplicateImportId: duplicate.import_id, rowsRead: 0, rowsWritten: 0, rowsFailed: 0, importedSheets: [], importStatus: 'duplicate', dataStatus: 'duplicate', message: 'File duplicate. Upload ditolak agar KPI tidak double-count.' };
   }
-  const sourceSystem = opts.sourceSystem || 'generic_excel';
-
-  appendObjects_('IMPORT_BATCH', [{
-    tenant_id: tenantId,
-    clinic_id: clinicId,
-    import_id: importId,
-    source_system: sourceSystem,
-    import_method: lowerName.endsWith('.csv') ? 'upload_csv' : 'upload_excel',
-    period_start: opts.periodStart || '',
-    period_end: opts.periodEnd || '',
-    status: 'validating',
-    data_status: 'partial',
-    started_at: now,
-    completed_at: '',
-    created_by: opts.actorId || opts.createdBy || 'dashboard_upload',
-    notes: fileName,
-  }]);
-
-  appendObjects_('IMPORT_FILE', [{
-    tenant_id: tenantId,
-    clinic_id: clinicId,
-    import_id: importId,
-    file_id: importId + '_file',
-    file_name: fileName,
-    file_type: lowerName.endsWith('.csv') ? 'csv' : 'xlsx',
-    source_report_name: opts.sourceReportName || 'POC_UPLOAD',
-    checksum: fileChecksum,
-    row_count: 0,
-    uploaded_at: now,
-    uploaded_by: opts.actorId || opts.createdBy || 'dashboard_upload',
-    status: 'uploaded',
-  }]);
+  appendImportJobStart_(tenantId, clinicId, importId, sourceSystem, lowerName, opts, fileName, fileChecksum, now);
 
   let result;
   try {
+    updateImportBatchStatus_(tenantId, clinicId, importId, 'importing', 'partial', '');
     if (lowerName.endsWith('.csv') || String(blob.getContentType()).indexOf('csv') !== -1) {
       result = importCsvBlob_(blob, importId, tenantId, clinicId, opts);
     } else {
       result = importExcelBlob_(blob, importId, tenantId, clinicId, opts);
     }
+    updateImportBatchStatus_(tenantId, clinicId, importId, 'computing', 'partial', '');
   } catch (err) {
     finalizeImportMetadata_(tenantId, clinicId, importId, 'failed', 'invalid', 0, opts.period || '', fileChecksum);
     appendSyncLog_(tenantId, clinicId, importId, 'import', sourceSystem, 'failed', now, new Date(), 0, 0, 0, err.message || String(err));
@@ -87,11 +91,18 @@ function importUploadedBlob_(blob, options) {
   const importStatus = result.rowsWritten > 0 ? (result.rowsFailed > 0 ? 'partial' : 'completed') : 'failed';
   const dataStatus = result.rowsFailed > 0 ? 'partial' : 'complete';
   finalizeImportMetadata_(tenantId, clinicId, importId, importStatus, dataStatus, result.rowsRead, period, fileChecksum);
-  const kpi = computePocKpisNoLock_(tenantId, clinicId, period);
+  let kpi;
+  try {
+    kpi = computePocKpisNoLock_(tenantId, clinicId, period);
+  } catch (err) {
+    updateImportBatchStatus_(tenantId, clinicId, importId, 'failed', 'partial', 'KPI compute failed: ' + (err.message || err));
+    appendSyncLog_(tenantId, clinicId, importId, 'compute', sourceSystem, 'failed', now, new Date(), result.rowsRead, result.rowsWritten, result.rowsFailed, err.message || String(err));
+    throw new Error('Import berhasil ditulis, tetapi compute KPI gagal: ' + (err.message || err));
+  }
   invalidateDashboardCache_(tenantId, clinicId, period);
   appendSyncLog_(tenantId, clinicId, importId, 'import', sourceSystem, importStatus === 'failed' ? 'failed' : 'success', now, new Date(), result.rowsRead, result.rowsWritten, result.rowsFailed, result.rowsFailed > 0 ? 'Import completed with validation failures. See VALIDATION_LOG.' : '');
   writeAudit_(opts.actorId || 'dashboard_upload', 'owner', 'upload_poc_file', 'IMPORT_BATCH', { importId, fileName, rowsWritten: result.rowsWritten, rowsFailed: result.rowsFailed, period });
-  return Object.assign({ ok: importStatus !== 'failed', importId, period, kpi, importStatus, dataStatus }, result);
+  return Object.assign({ ok: importStatus !== 'failed', importId, period, kpi, importStatus, dataStatus, job: getImportJobById_(tenantId, clinicId, importId) }, result);
   });
 }
 
@@ -365,6 +376,50 @@ function findCompletedImportByChecksum_(tenantId, clinicId, checksum) {
   return getRowsAsObjects_('IMPORT_FILE').find(row => row.tenant_id === tenantId && row.clinic_id === clinicId && row.checksum === checksum && String(row.status || '').toLowerCase() === 'completed') || null;
 }
 
+function appendImportJobStart_(tenantId, clinicId, importId, sourceSystem, lowerName, opts, fileName, fileChecksum, startedAt) {
+  appendObjects_('IMPORT_BATCH', [{
+    tenant_id: tenantId,
+    clinic_id: clinicId,
+    import_id: importId,
+    source_system: sourceSystem,
+    import_method: lowerName.endsWith('.csv') ? 'upload_csv' : 'upload_excel',
+    period_start: opts.periodStart || opts.period || '',
+    period_end: opts.periodEnd || '',
+    status: 'validating',
+    data_status: 'partial',
+    started_at: startedAt,
+    completed_at: '',
+    created_by: opts.actorId || opts.createdBy || 'dashboard_upload',
+    notes: fileName,
+  }]);
+
+  appendObjects_('IMPORT_FILE', [{
+    tenant_id: tenantId,
+    clinic_id: clinicId,
+    import_id: importId,
+    file_id: importId + '_file',
+    file_name: fileName,
+    file_type: lowerName.endsWith('.csv') ? 'csv' : 'xlsx',
+    source_report_name: opts.sourceReportName || 'POC_UPLOAD',
+    checksum: fileChecksum,
+    row_count: 0,
+    uploaded_at: startedAt,
+    uploaded_by: opts.actorId || opts.createdBy || 'dashboard_upload',
+    status: 'uploaded',
+  }]);
+}
+
+function updateImportBatchStatus_(tenantId, clinicId, importId, status, dataStatus, notes) {
+  updateObjectsWhere_('IMPORT_BATCH', function(row) {
+    return row.tenant_id === tenantId && row.clinic_id === clinicId && row.import_id === importId;
+  }, function(row) {
+    row.status = status || row.status;
+    row.data_status = dataStatus || row.data_status;
+    if (notes) row.notes = notes;
+    return row;
+  });
+}
+
 function finalizeImportMetadata_(tenantId, clinicId, importId, importStatus, dataStatus, rowCount, period, checksum) {
   const matchesImport = function(row) { return row.tenant_id === tenantId && row.clinic_id === clinicId && row.import_id === importId; };
   updateObjectsWhere_('IMPORT_BATCH', matchesImport, function(row) {
@@ -385,6 +440,119 @@ function finalizeImportMetadata_(tenantId, clinicId, importId, importStatus, dat
 
 function appendSyncLog_(tenantId, clinicId, importId, jobType, sourceSystem, status, startedAt, finishedAt, rowsRead, rowsWritten, rowsFailed, errorMessage) {
   appendObjects_('SYNC_LOG', [{ tenant_id: tenantId, clinic_id: clinicId, sync_id: importId, job_type: jobType, source_system: sourceSystem, import_id: importId, status, started_at: startedAt, finished_at: finishedAt, rows_read: rowsRead, rows_written: rowsWritten, rows_failed: rowsFailed, error_message: errorMessage || '' }]);
+}
+
+function getImportJobById_(tenantId, clinicId, importId) {
+  const batch = getScopedRows_('IMPORT_BATCH', tenantId, clinicId).find(function(row) { return row.import_id === importId; });
+  if (!batch) return null;
+  return buildImportJobRow_(
+    batch,
+    indexLatestImportFiles_(tenantId, clinicId)[importId],
+    indexLatestSyncLogs_(tenantId, clinicId)[importId],
+    summarizeValidationByImport_(tenantId, clinicId)[importId]
+  );
+}
+
+function buildImportJobRow_(batch, file, sync, validation) {
+  const startedAt = batch.started_at || (file && file.uploaded_at) || '';
+  const completedAt = batch.completed_at || (sync && sync.finished_at) || '';
+  const rowsRead = Number((sync && sync.rows_read) || (file && file.row_count) || 0);
+  const rowsWritten = Number((sync && sync.rows_written) || 0);
+  const rowsFailed = Number((sync && sync.rows_failed) || (validation && validation.errorCount) || 0);
+  return {
+    importId: batch.import_id || '',
+    tenantId: batch.tenant_id || '',
+    clinicId: batch.clinic_id || '',
+    fileName: (file && file.file_name) || batch.notes || '',
+    fileType: (file && file.file_type) || '',
+    sourceSystem: batch.source_system || '',
+    method: batch.import_method || '',
+    status: batch.status || (sync && sync.status) || 'unknown',
+    dataStatus: batch.data_status || '',
+    periodStart: batch.period_start || '',
+    periodEnd: batch.period_end || '',
+    startedAt: formatJobDate_(startedAt),
+    completedAt: formatJobDate_(completedAt),
+    durationSeconds: computeDurationSeconds_(startedAt, completedAt),
+    createdBy: batch.created_by || '',
+    rowsRead: rowsRead,
+    rowsWritten: rowsWritten,
+    rowsFailed: rowsFailed,
+    validationCount: Number((validation && validation.count) || 0),
+    validationErrors: (validation && validation.samples) || [],
+    errorMessage: (sync && sync.error_message) || '',
+    checksum: (file && file.checksum) || '',
+  };
+}
+
+function indexLatestImportFiles_(tenantId, clinicId) {
+  return getScopedRows_('IMPORT_FILE', tenantId, clinicId).reduce(function(index, row) {
+    const existing = index[row.import_id];
+    if (!existing || dateSortValue_(row.uploaded_at) >= dateSortValue_(existing.uploaded_at)) index[row.import_id] = row;
+    return index;
+  }, {});
+}
+
+function indexLatestSyncLogs_(tenantId, clinicId) {
+  return getScopedRows_('SYNC_LOG', tenantId, clinicId).reduce(function(index, row) {
+    const existing = index[row.import_id];
+    if (!existing || dateSortValue_(row.finished_at || row.started_at) >= dateSortValue_(existing.finished_at || existing.started_at)) index[row.import_id] = row;
+    return index;
+  }, {});
+}
+
+function summarizeValidationByImport_(tenantId, clinicId) {
+  return getScopedRows_('VALIDATION_LOG', tenantId, clinicId).reduce(function(index, row) {
+    const importId = row.import_id || '';
+    if (!importId) return index;
+    if (!index[importId]) index[importId] = { count: 0, errorCount: 0, samples: [] };
+    index[importId].count++;
+    if (String(row.severity || '').toLowerCase() === 'error') index[importId].errorCount++;
+    if (index[importId].samples.length < 3) {
+      index[importId].samples.push({
+        targetSheet: row.target_sheet || '',
+        rowNumber: row.row_number || '',
+        issueType: row.issue_type || '',
+        message: row.message || '',
+      });
+    }
+    return index;
+  }, {});
+}
+
+function summarizeImportJobs_(jobs) {
+  const summary = { total: jobs.length, running: 0, completed: 0, failed: 0, partial: 0, duplicate: 0, rowsWritten: 0, rowsFailed: 0 };
+  (jobs || []).forEach(function(job) {
+    const status = String(job.status || '').toLowerCase();
+    if (['validating', 'importing', 'computing'].indexOf(status) !== -1) summary.running++;
+    else if (status === 'completed') summary.completed++;
+    else if (status === 'partial') summary.partial++;
+    else if (status === 'duplicate') summary.duplicate++;
+    else if (status === 'failed') summary.failed++;
+    summary.rowsWritten += Number(job.rowsWritten || 0);
+    summary.rowsFailed += Number(job.rowsFailed || 0);
+  });
+  return summary;
+}
+
+function dateSortValue_(value) {
+  if (!value) return 0;
+  const date = value instanceof Date ? value : new Date(value);
+  const time = date.getTime();
+  return isNaN(time) ? 0 : time;
+}
+
+function formatJobDate_(value) {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) return String(value);
+  return Utilities.formatDate(date, APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss');
+}
+
+function computeDurationSeconds_(startedAt, completedAt) {
+  const start = dateSortValue_(startedAt);
+  const end = dateSortValue_(completedAt);
+  return start && end && end >= start ? Math.round((end - start) / 1000) : 0;
 }
 
 function inferImportPeriod_(result) {

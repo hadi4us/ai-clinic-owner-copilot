@@ -211,3 +211,11 @@ Third implementation slice:
 4. Add idempotency so rerunning provisioning does not create duplicate warehouses.
 5. Add tenant registry visibility and provisioning controls to Account/Akses.
 6. Reduce dashboard visual noise and tighten copy so the product feels operational, not demo-like.
+
+Fourth implementation slice:
+
+1. Add tenant-scoped import job status payload from `IMPORT_BATCH`, `IMPORT_FILE`, `SYNC_LOG`, and `VALIDATION_LOG`.
+2. Record intermediate import states for upload validation, import write, and KPI compute.
+3. Make duplicate uploads visible as `duplicate` jobs for auditability.
+4. Show recent import jobs in Upload Data with row counts, duration, status, and validation/error notes.
+5. Keep full async/chunked trigger workers as the next import reliability step.

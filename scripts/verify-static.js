@@ -77,6 +77,11 @@ assertIncludes('gas/src/Config.js', [
 
 assertIncludes('gas/src/ImportService.js', [
   'updateObjectsWhere_',
+  'getDefaultImportJobPayload',
+  'getImportJobPayloadForContext_',
+  'appendImportJobStart_',
+  'updateImportBatchStatus_',
+  'summarizeValidationByImport_',
   'validateUploadBlob_',
   'maxImportRows',
   'maxImportSheets',
@@ -172,6 +177,8 @@ assertIncludes('gas/src/Api.js', [
   'deleteTransactionEntryForContext_',
   'growthAssistant',
   'getGrowthAssistantPayloadForContext_',
+  'importJobs',
+  'getDefaultImportJobPayload',
 ]);
 
 assertIncludes('gas/src/GrowthAssistantService.js', [
@@ -206,6 +213,9 @@ assertIncludes('gas/src/Dashboard.html', [
   'Tenant Provisioning',
   'tenantRegistryRows',
   'provisionTenant()',
+  'Riwayat Import',
+  'loadImportJobs',
+  'renderImportJobs',
   'getDefaultTenantAdminPayload',
   'provisionDefaultTenant',
 ]);
@@ -255,7 +265,7 @@ for (const file of ['gas/src/Config.js', 'src/Core/Config.gs']) {
 
 const docs = read('docs/SOURCE_OF_TRUTH_AND_DEPLOYMENT.md');
 assert(docs.includes('A versioned deployment was updated from the `hadi4us@gmail.com`-authorized clasp user'), 'Docs must record the current hadi4us pilot deployment');
-assert(docs.includes('Version: `52`'), 'Docs must record the current versioned Apps Script version');
+assert(docs.includes('Version: `55`'), 'Docs must record the current versioned Apps Script version');
 assert(docs.includes('AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag'), 'Docs must record the current versioned deployment ID');
 assert(docs.includes('All Google-side resources for this project must use `hadi4us@gmail.com`'), 'Docs must state hadi4us Google account policy');
 assert(docs.includes('Deprecated ccc19depok deployments'), 'Docs must record old deployment deprecation');
@@ -271,6 +281,7 @@ assertIncludes('docs/21-PRODUCTION-SAAS-TASKS.md', [
   'P0.1 Auth, Account, and User Access',
   'Tenant Registry',
   'Job-Based Import Pipeline',
+  'Import job payload added',
 ]);
 
 console.log('OK: static safety checks passed');

@@ -40,11 +40,11 @@ Status legend:
 
 ### P0.4 Job-Based Import Pipeline
 
-- `[ ]` Add import job state model.
-- `[ ]` Split upload validation/import/compute steps.
+- `[x]` Add import job state model.
+- `[~]` Split upload validation/import/compute steps.
 - `[ ]` Add retry-safe compute.
-- `[ ]` Show job status in UI.
-- `[ ]` Add job duration/error summary.
+- `[x]` Show job status in UI.
+- `[x]` Add job duration/error summary.
 
 ### P0.5 Audit, Backup, Recovery
 
@@ -91,3 +91,13 @@ Status legend:
 - `[x]` Static/local checks pass.
 - `[x]` Apps Script version deployed.
 - `[x]` GitHub commit pushed.
+
+## Current Slice - P0.4 Import Job Status
+
+- `[x]` Import upload now records clearer states: `validating`, `importing`, `computing`, final `completed` / `partial` / `failed` / `duplicate`.
+- `[x]` Duplicate uploads are recorded as visible import jobs instead of disappearing after rejection.
+- `[x]` Import job payload added for tenant-scoped status reads.
+- `[x]` Job summary includes file, status, row counts, duration, error message, and validation samples.
+- `[x]` Upload Data UI includes import history, KPI-style job counters, and validation/error notes.
+- `[ ]` Add trigger-backed chunk worker for large imports.
+- `[ ]` Add retry action for failed compute/import jobs.
