@@ -42,6 +42,8 @@ function readinessCheck() {
   } catch (err) {}
   addReadinessCheck_(checks, 'kpi_data_available', kpiRows > 0, 'Run setup fixture or import clinic CSV/XLSX then compute KPI.', { latestPeriod, kpiRows });
 
+  const release = getReleaseReadinessInfo_();
+  addReadinessCheck_(checks, 'release_version_documented', !!(release.appsScriptVersion || release.gitCommit || release.releaseLabel), 'Set RELEASE_APPS_SCRIPT_VERSION / RELEASE_GIT_COMMIT / RELEASE_LABEL for production diagnostics.', release);
   const ok = checks.every(check => check.ok);
   return {
     ok,
@@ -49,10 +51,20 @@ function readinessCheck() {
     generatedAt: Utilities.formatDate(now, APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
     appName: APP_CONFIG.appName,
     schemaVersion: APP_CONFIG.schemaVersion,
+    release,
     spreadsheetId: maskId_(getConfiguredSpreadsheetId_()),
     tenantRegistry,
     checks,
     nextActions: checks.filter(check => !check.ok).map(check => check.message),
+  };
+}
+
+function getReleaseReadinessInfo_() {
+  return {
+    appsScriptVersion: getScriptProperty_('RELEASE_APPS_SCRIPT_VERSION', ''),
+    gitCommit: getScriptProperty_('RELEASE_GIT_COMMIT', ''),
+    releaseLabel: getScriptProperty_('RELEASE_LABEL', ''),
+    deploymentId: maskId_(getScriptProperty_('RELEASE_DEPLOYMENT_ID', '')),
   };
 }
 

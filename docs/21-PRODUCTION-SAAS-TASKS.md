@@ -53,7 +53,7 @@ Status legend:
 - `[ ]` Expand audit events.
 - `[ ]` Add backup workflow doc.
 - `[ ]` Add restore workflow doc.
-- `[ ]` Add release version/readiness output.
+- `[x]` Add release version/readiness output.
 - `[ ]` Add backup status to admin console.
 
 ### P0.6 Materialized Analytics
