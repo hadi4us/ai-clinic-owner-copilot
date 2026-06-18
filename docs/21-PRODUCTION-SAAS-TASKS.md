@@ -101,7 +101,7 @@ Status legend:
 - `[x]` Import job payload added for tenant-scoped status reads.
 - `[x]` Job summary includes file, status, row counts, duration, error message, and validation samples.
 - `[x]` Upload Data UI includes import history, KPI-style job counters, and validation/error notes.
-- `[ ]` Add trigger-backed chunk worker for large imports.
+- `[~]` Add trigger-backed chunk worker for large imports. Runbook added; implementation pending.
 - `[x]` Add compute-only retry action for jobs whose transaction rows were already written.
 - `[x]` Prevent retry from re-importing rows or double-counting transactions.
 - `[x]` Upload pipeline now explicitly marks validating -> importing -> computing with operator-facing notes.
