@@ -23,6 +23,8 @@ const APP_CONFIG = {
     maxUploadBytes: 5 * 1024 * 1024,
     maxImportRows: 5000,
     maxImportSheets: 8,
+    importChunkRows: 500,
+    importChunkMaxRuntimeMs: 240000,
     dashboardCacheTtlSeconds: 120,
   }),
 
@@ -74,6 +76,8 @@ APP_CONFIG.lockWaitMs = APP_CONFIG.runtime.lockWaitMs;
 APP_CONFIG.maxUploadBytes = APP_CONFIG.runtime.maxUploadBytes;
 APP_CONFIG.maxImportRows = APP_CONFIG.runtime.maxImportRows;
 APP_CONFIG.maxImportSheets = APP_CONFIG.runtime.maxImportSheets;
+APP_CONFIG.importChunkRows = APP_CONFIG.runtime.importChunkRows;
+APP_CONFIG.importChunkMaxRuntimeMs = APP_CONFIG.runtime.importChunkMaxRuntimeMs;
 APP_CONFIG.dashboardCacheTtlSeconds = APP_CONFIG.runtime.dashboardCacheTtlSeconds;
 Object.freeze(APP_CONFIG);
 

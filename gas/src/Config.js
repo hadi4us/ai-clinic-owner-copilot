@@ -15,6 +15,8 @@ const APP_CONFIG = Object.freeze({
   maxUploadBytes: 5 * 1024 * 1024,
   maxImportRows: 5000,
   maxImportSheets: 8,
+  importChunkRows: 500,
+  importChunkMaxRuntimeMs: 240000,
   dashboardCacheTtlSeconds: 120,
 });
 

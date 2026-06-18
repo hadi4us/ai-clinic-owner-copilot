@@ -13,6 +13,10 @@ function getDefaultImportJobPayload(limit) {
   return getImportJobPayloadForContext_(context, limit || 10);
 }
 
+function runDefaultImportChunkWorker() {
+  return runImportChunkWorker_();
+}
+
 function retryDefaultImportCompute(importId) {
   const context = resolveRequestContext_({}, {}, 'finance');
   return retryImportComputeForContext_(context, importId);
@@ -184,6 +188,49 @@ function validateImportBlobPlan_(blob, lowerName, options) {
     throw new Error('Upload Excel membutuhkan Advanced Google Service: Drive API. Enable Drive API di Apps Script Services, atau upload CSV untuk POC cepat.');
   }
   return { ok: true, fileType: 'xlsx', sheetCount: 1, rowsRead: 0, targets: [] };
+}
+
+function runImportChunkWorker_() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty('IMPORT_CHUNK_QUEUE_JSON') || '[]';
+  let queue = [];
+  try { queue = JSON.parse(raw) || []; } catch (err) { queue = []; }
+  const job = queue.filter(function(item) { return item && ['queued', 'waiting', 'running'].indexOf(String(item.status || 'queued')) !== -1; })[0];
+  if (!job) return { ok: true, message: 'Tidak ada import chunk job aktif.', processed: 0 };
+  const startedAt = new Date();
+  const maxRuntimeMs = Number(APP_CONFIG.importChunkMaxRuntimeMs || 240000);
+  const chunkRows = Number(job.chunkRows || APP_CONFIG.importChunkRows || 500);
+  const tenantId = job.tenantId || APP_CONFIG.defaultTenantId;
+  const clinicId = job.clinicId || APP_CONFIG.defaultClinicId;
+  return withTenantClinicLock_('import_chunk_worker', tenantId, clinicId, function() {
+    updateImportBatchStatus_(tenantId, clinicId, job.importId, 'running', 'partial', 'Chunk import berjalan mulai row ' + (Number(job.nextRowOffset || 0) + 1) + '.');
+    const rows = job.rows || [];
+    const targetSheet = job.targetSheet;
+    const start = Number(job.nextRowOffset || 0);
+    const end = Math.min(rows.length, start + chunkRows);
+    const result = importObjectRowsToFinalSheet_(targetSheet, rows.slice(start, end), job.importId, tenantId, clinicId, job.sourceSheetName || 'CHUNK');
+    job.nextRowOffset = end;
+    job.rowsRead = Number(job.rowsRead || 0) + result.rowsRead;
+    job.rowsWritten = Number(job.rowsWritten || 0) + result.rowsWritten;
+    job.rowsFailed = Number(job.rowsFailed || 0) + result.rowsFailed;
+    job.updatedAt = Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss');
+    if (job.nextRowOffset < rows.length && (new Date().getTime() - startedAt.getTime()) < maxRuntimeMs) {
+      job.status = 'waiting';
+      updateImportBatchStatus_(tenantId, clinicId, job.importId, 'waiting', 'partial', 'Chunk import menunggu trigger berikutnya: ' + job.nextRowOffset + '/' + rows.length + ' row.');
+      appendSyncLog_(tenantId, clinicId, job.importId, 'import_chunk', job.sourceSystem || 'generic_excel', 'waiting', startedAt, new Date(), result.rowsRead, result.rowsWritten, result.rowsFailed, 'Chunk selesai, masih ada row tersisa.');
+    } else {
+      job.status = 'computing';
+      updateImportBatchStatus_(tenantId, clinicId, job.importId, 'computing', 'partial', 'Semua chunk selesai. Compute KPI berjalan.');
+      const period = job.period || inferImportPeriodForScope_(tenantId, clinicId) || toPeriodString_(new Date());
+      computePocKpisNoLock_(tenantId, clinicId, period);
+      invalidateDashboardCache_(tenantId, clinicId, period);
+      updateImportBatchStatus_(tenantId, clinicId, job.importId, job.rowsFailed > 0 ? 'partial' : 'completed', job.rowsFailed > 0 ? 'partial' : 'complete', 'Chunk import selesai: ' + job.rowsWritten + ' row tertulis.');
+      appendSyncLog_(tenantId, clinicId, job.importId, 'import_chunk', job.sourceSystem || 'generic_excel', 'success', startedAt, new Date(), job.rowsRead, job.rowsWritten, job.rowsFailed, '');
+      job.status = 'completed';
+    }
+    props.setProperty('IMPORT_CHUNK_QUEUE_JSON', JSON.stringify(queue));
+    return { ok: true, importId: job.importId, status: job.status, nextRowOffset: job.nextRowOffset, rowsRead: job.rowsRead, rowsWritten: job.rowsWritten, rowsFailed: job.rowsFailed };
+  });
 }
 
 function importCsvBlob_(blob, importId, tenantId, clinicId, options) {
