@@ -114,7 +114,25 @@ function getTenantAdminPayloadForContext_(context) {
     ok: true,
     currentTenantId: context.tenantId,
     rows: rows,
+    backupStatus: getBackupStatusForTenant_(context.tenantId, context.clinicId),
     generatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
+  };
+}
+
+function getBackupStatusForTenant_(tenantId, clinicId) {
+  const lastBackupAt = getScriptProperty_('LAST_BACKUP_AT', '');
+  const lastBackupReleaseLabel = getScriptProperty_('LAST_BACKUP_RELEASE_LABEL', getScriptProperty_('RELEASE_LABEL', ''));
+  const lastBackupSpreadsheetId = getScriptProperty_('LAST_BACKUP_SPREADSHEET_ID', '');
+  const releaseVersion = getScriptProperty_('RELEASE_APPS_SCRIPT_VERSION', '');
+  return {
+    tenantId: tenantId,
+    clinicId: clinicId,
+    lastBackupAt: lastBackupAt,
+    lastBackupReleaseLabel: lastBackupReleaseLabel,
+    lastBackupSpreadsheetIdMasked: maskId_(lastBackupSpreadsheetId),
+    backupRequiredBeforeRelease: !lastBackupAt,
+    releaseVersion: releaseVersion,
+    restoreRunbookUrl: 'docs/BACKUP_AND_RESTORE.md',
   };
 }
 

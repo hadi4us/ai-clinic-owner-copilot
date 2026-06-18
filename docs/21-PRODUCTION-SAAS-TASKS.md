@@ -54,7 +54,7 @@ Status legend:
 - `[x]` Add backup workflow doc.
 - `[x]` Add restore workflow doc.
 - `[x]` Add release version/readiness output.
-- `[ ]` Add backup status to admin console.
+- `[x]` Add backup status to admin console.
 
 ### P0.6 Materialized Analytics
 
