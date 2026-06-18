@@ -106,7 +106,8 @@ Status legend:
 
 ## Current Slice - Tenant Onboarding Wizard
 
-- `[x]` Dashboard now includes a 3-step onboarding wizard: Profil Klinik, Upload Data, Review Hasil.
+- `[x]` Sidebar now includes a dedicated `Setup Awal Klinik` menu with a 3-step onboarding wizard: Profil Klinik, Upload Data, Review Hasil.
+- `[x]` The finance dashboard stays focused on KPI and owner actions instead of containing the full setup form.
 - `[x]` Current clinic profile can be read from `MASTER_KLINIK` and saved by owner/admin.
 - `[x]` Wizard progress is driven by profile completeness, dashboard data presence, data quality, and report readiness.
 - `[x]` Upload step links directly to template download and Upload Data.
