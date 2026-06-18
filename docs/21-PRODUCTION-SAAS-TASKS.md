@@ -43,7 +43,7 @@ Status legend:
 ### P0.4 Job-Based Import Pipeline
 
 - `[x]` Add import job state model.
-- `[~]` Split upload validation/import/compute steps.
+- `[x]` Split upload validation/import/compute steps.
 - `[x]` Add retry-safe compute.
 - `[x]` Show job status in UI.
 - `[x]` Add job duration/error summary.
@@ -104,6 +104,7 @@ Status legend:
 - `[ ]` Add trigger-backed chunk worker for large imports.
 - `[x]` Add compute-only retry action for jobs whose transaction rows were already written.
 - `[x]` Prevent retry from re-importing rows or double-counting transactions.
+- `[x]` Upload pipeline now explicitly marks validating -> importing -> computing with operator-facing notes.
 
 ## Current Slice - Tenant Onboarding Wizard
 

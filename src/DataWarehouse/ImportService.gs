@@ -136,13 +136,15 @@ function importUploadedBlob_(blob, options) {
 
   let result;
   try {
-    updateImportBatchStatus_(tenantId, clinicId, importId, 'importing', 'partial', '');
+    updateImportBatchStatus_(tenantId, clinicId, importId, 'validating', 'partial', 'Validasi struktur file berjalan.');
+    const importPlan = validateImportBlobPlan_(blob, lowerName, opts);
+    updateImportBatchStatus_(tenantId, clinicId, importId, 'importing', 'partial', 'Validasi selesai. Import ' + importPlan.sheetCount + ' sheet / ' + importPlan.rowsRead + ' row berjalan.');
     if (lowerName.endsWith('.csv') || String(blob.getContentType()).indexOf('csv') !== -1) {
       result = importCsvBlob_(blob, importId, tenantId, clinicId, opts);
     } else {
       result = importExcelBlob_(blob, importId, tenantId, clinicId, opts);
     }
-    updateImportBatchStatus_(tenantId, clinicId, importId, 'computing', 'partial', '');
+    updateImportBatchStatus_(tenantId, clinicId, importId, 'computing', 'partial', 'Import selesai. Compute KPI berjalan.');
   } catch (err) {
     finalizeImportMetadata_(tenantId, clinicId, importId, 'failed', 'invalid', 0, opts.period || '', fileChecksum);
     appendSyncLog_(tenantId, clinicId, importId, 'import', sourceSystem, 'failed', now, new Date(), 0, 0, 0, err.message || String(err));
@@ -166,6 +168,22 @@ function importUploadedBlob_(blob, options) {
   writeAudit_(opts.actorId || 'dashboard_upload', 'owner', 'upload_poc_file', 'IMPORT_BATCH', { importId, fileName, rowsWritten: result.rowsWritten, rowsFailed: result.rowsFailed, period });
   return Object.assign({ ok: importStatus !== 'failed', importId, period, kpi, importStatus, dataStatus, job: getImportJobById_(tenantId, clinicId, importId) }, result);
   });
+}
+
+function validateImportBlobPlan_(blob, lowerName, options) {
+  if (lowerName.endsWith('.csv') || String(blob.getContentType()).indexOf('csv') !== -1) {
+    const csvText = blob.getDataAsString();
+    const values = Utilities.parseCsv(csvText);
+    if (!values.length) throw new Error('CSV kosong. Sertakan header dan minimal satu baris data.');
+    assertImportRowLimit_(values.length - 1);
+    const targetSheet = options.targetSheet || detectTargetSheetFromHeaders_(values[0]);
+    if (!targetSheet) throw new Error('Header CSV tidak dikenali. Sertakan kolom tanggal + amount/nilai atau pilih targetSheet eksplisit.');
+    return { ok: true, fileType: 'csv', sheetCount: 1, rowsRead: values.length - 1, targets: [targetSheet] };
+  }
+  if (typeof Drive === 'undefined' || !Drive.Files || !Drive.Files.insert) {
+    throw new Error('Upload Excel membutuhkan Advanced Google Service: Drive API. Enable Drive API di Apps Script Services, atau upload CSV untuk POC cepat.');
+  }
+  return { ok: true, fileType: 'xlsx', sheetCount: 1, rowsRead: 0, targets: [] };
 }
 
 function importCsvBlob_(blob, importId, tenantId, clinicId, options) {
