@@ -50,7 +50,7 @@ Status legend:
 
 ### P0.5 Audit, Backup, Recovery
 
-- `[ ]` Expand audit events.
+- `[x]` Expand audit events.
 - `[x]` Add backup workflow doc.
 - `[x]` Add restore workflow doc.
 - `[x]` Add release version/readiness output.
