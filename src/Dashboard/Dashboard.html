@@ -59,22 +59,6 @@
         <div class="auth-banner" id="authBanner"><b>Akses belum valid</b><div id="authMessage">Memeriksa sesi login...</div><div id="browserLogin" class="browser-login" style="display:none"><div class="two-grid"><div><label>Username</label><input id="browserLoginEmail" type="text" placeholder="Email yang terdaftar di USER_ACCESS" autocomplete="username"></div><div><label>Password</label><input id="browserLoginCode" type="password" placeholder="Password akun" autocomplete="current-password" onkeydown="if(event.key==='Enter')bindBrowserLogin()"></div></div><div class="top-actions" style="margin-top:12px"><button id="browserLoginBtn" class="primary" onclick="bindBrowserLogin()">Masuk</button><button class="secondary" onclick="clearBrowserLogin()">Keluar</button></div><div class="muted" style="margin-top:8px">Login ini tetap memakai USER_ACCESS untuk role, tenant, dan clinic scope. Gunakan email yang sama dengan baris USER_ACCESS tenant.</div></div></div>
         <section id="view-dashboard" class="view active">
           <div class="top"><div><div class="eyebrow">Owner Dashboard</div><h1>Ringkasan Keuangan Klinik</h1><div class="sub" id="subtitle">Memuat data periode berjalan...</div></div><div class="top-actions"><button id="refreshBtn" class="primary" onclick="loadDashboard()">Perbarui</button><button class="secondary" onclick="showView('upload')">Upload Data</button></div></div>
-          <section class="card tenant-home" id="tenantHome">
-            <div class="section-head"><div><h2 class="section-title">Mulai dari sini</h2><div class="muted">Status tenant dan langkah berikutnya untuk membuat dashboard siap dipakai owner klinik.</div></div><span class="ai-badge" id="tenantReadyBadge">Memeriksa</span></div>
-            <div class="tenant-status-grid">
-              <div>
-                <div class="tenant-scope">
-                  <div class="scope-box"><b>Klinik</b><span id="tenantHomeClinic">-</span></div>
-                  <div class="scope-box"><b>Periode</b><span id="tenantHomePeriod">-</span></div>
-                  <div class="scope-box"><b>Status Data</b><span id="tenantHomeStatus">-</span></div>
-                </div>
-                <div class="step-list" id="tenantReadySteps" style="margin-top:12px"></div>
-              </div>
-              <div>
-                <div class="next-actions" id="ownerNextActions"></div>
-              </div>
-            </div>
-          </section>
           <section class="card hero"><div class="label" id="profitLabel">Laba Bersih</div><div class="value" id="netProfit">-</div><div class="note" id="profitNote">-</div><div class="hero-meta"><span class="hero-chip" id="heroRevenue">Omzet -</span><span class="hero-chip" id="heroCost">Biaya -</span><span class="hero-chip" id="heroMargin">Margin -</span></div></section>
           <section class="grid">
             <div class="card metric good"><div class="name">Omzet</div><div class="num" id="revenue">-</div><div class="hint" id="revenueGrowth">Perubahan -</div></div>
@@ -95,6 +79,22 @@
             <div class="card"><h2 class="section-title">Struktur Biaya</h2><div id="costBreakdown"></div></div>
           </section>
           <section class="card"><h2 class="section-title">Tren Omzet, Biaya, dan Laba Harian</h2><canvas id="financeChart" height="170"></canvas><div class="empty" id="chartEmpty" style="display:none">Trend harian belum tersedia.</div></section>
+          <section class="card tenant-home" id="tenantHome">
+            <div class="section-head"><div><h2 class="section-title">Mulai dari sini</h2><div class="muted">Status tenant dan langkah berikutnya untuk membuat dashboard siap dipakai owner klinik.</div></div><span class="ai-badge" id="tenantReadyBadge">Memeriksa</span></div>
+            <div class="tenant-status-grid">
+              <div>
+                <div class="tenant-scope">
+                  <div class="scope-box"><b>Klinik</b><span id="tenantHomeClinic">-</span></div>
+                  <div class="scope-box"><b>Periode</b><span id="tenantHomePeriod">-</span></div>
+                  <div class="scope-box"><b>Status Data</b><span id="tenantHomeStatus">-</span></div>
+                </div>
+                <div class="step-list" id="tenantReadySteps" style="margin-top:12px"></div>
+              </div>
+              <div>
+                <div class="next-actions" id="ownerNextActions"></div>
+              </div>
+            </div>
+          </section>
         </section>
 
         <section id="view-setup" class="view">
