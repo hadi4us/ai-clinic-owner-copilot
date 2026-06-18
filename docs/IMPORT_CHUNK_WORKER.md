@@ -46,7 +46,7 @@ For MVP, `IMPORT_BATCH.notes` can expose operator-facing progress while the dura
 ## Trigger Guardrails
 
 - One active trigger per import job.
-- Worker must delete stale duplicate triggers for the same job after taking the lock.
+- Worker must delete stale duplicate triggers for the same handler before installing another trigger.
 - Every trigger run writes start/end status into `SYNC_LOG`.
 - If lease is active, a second worker exits without mutation.
 - If retry count exceeds threshold, status becomes `failed` with visible `lastError`.

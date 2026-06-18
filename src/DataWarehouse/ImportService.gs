@@ -238,12 +238,25 @@ function queueChunkedImportFromBlob_(blob, lowerName, importPlan, importId, tena
 
 function installImportChunkWorkerTrigger_() {
   if (typeof ScriptApp === 'undefined' || !ScriptApp.newTrigger) return { ok: false, message: 'ScriptApp trigger API unavailable.' };
-  const existing = ScriptApp.getProjectTriggers().filter(function(trigger) {
-    return trigger.getHandlerFunction && trigger.getHandlerFunction() === 'runDefaultImportChunkWorker';
-  });
+  dedupeImportChunkWorkerTriggers_();
+  const existing = getImportChunkWorkerTriggers_();
   if (existing.length) return { ok: true, existing: true, count: existing.length };
   const trigger = ScriptApp.newTrigger('runDefaultImportChunkWorker').timeBased().after(60 * 1000).create();
   return { ok: true, triggerId: trigger.getUniqueId ? trigger.getUniqueId() : '' };
+}
+
+function getImportChunkWorkerTriggers_() {
+  if (typeof ScriptApp === 'undefined' || !ScriptApp.getProjectTriggers) return [];
+  return ScriptApp.getProjectTriggers().filter(function(trigger) {
+    return trigger.getHandlerFunction && trigger.getHandlerFunction() === 'runDefaultImportChunkWorker';
+  });
+}
+
+function dedupeImportChunkWorkerTriggers_() {
+  if (typeof ScriptApp === 'undefined' || !ScriptApp.deleteTrigger) return { ok: false, deleted: 0 };
+  const triggers = getImportChunkWorkerTriggers_();
+  triggers.slice(1).forEach(function(trigger) { ScriptApp.deleteTrigger(trigger); });
+  return { ok: true, deleted: Math.max(0, triggers.length - 1) };
 }
 
 function runImportChunkWorker_() {
@@ -274,6 +287,7 @@ function runImportChunkWorker_() {
       job.status = 'waiting';
       updateImportBatchStatus_(tenantId, clinicId, job.importId, 'waiting', 'partial', 'Chunk import menunggu trigger berikutnya: ' + job.nextRowOffset + '/' + rows.length + ' row.');
       appendSyncLog_(tenantId, clinicId, job.importId, 'import_chunk', job.sourceSystem || 'generic_excel', 'waiting', startedAt, new Date(), result.rowsRead, result.rowsWritten, result.rowsFailed, 'Chunk selesai, masih ada row tersisa.');
+      installImportChunkWorkerTrigger_();
     } else {
       job.status = 'computing';
       updateImportBatchStatus_(tenantId, clinicId, job.importId, 'computing', 'partial', 'Semua chunk selesai. Compute KPI berjalan.');
@@ -283,6 +297,7 @@ function runImportChunkWorker_() {
       updateImportBatchStatus_(tenantId, clinicId, job.importId, job.rowsFailed > 0 ? 'partial' : 'completed', job.rowsFailed > 0 ? 'partial' : 'complete', 'Chunk import selesai: ' + job.rowsWritten + ' row tertulis.');
       appendSyncLog_(tenantId, clinicId, job.importId, 'import_chunk', job.sourceSystem || 'generic_excel', 'success', startedAt, new Date(), job.rowsRead, job.rowsWritten, job.rowsFailed, '');
       job.status = 'completed';
+      dedupeImportChunkWorkerTriggers_();
     }
     props.setProperty('IMPORT_CHUNK_QUEUE_JSON', JSON.stringify(queue));
     return { ok: true, importId: job.importId, status: job.status, nextRowOffset: job.nextRowOffset, rowsRead: job.rowsRead, rowsWritten: job.rowsWritten, rowsFailed: job.rowsFailed };
