@@ -318,7 +318,7 @@ Minimum MVP backup policy:
 | Release notes | Every production release | Permanent |
 | Audit logs | Append-only sheet/export | 90+ days, longer for production |
 
-Backups must not be shared broadly and must respect tenant isolation.
+Backups must not be shared broadly and must respect tenant isolation. See `docs/BACKUP_AND_RESTORE.md` for the operational runbook.
 
 ---
 
