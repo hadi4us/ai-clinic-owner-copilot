@@ -143,6 +143,13 @@ function importUploadedBlob_(blob, options) {
     updateImportBatchStatus_(tenantId, clinicId, importId, 'validating', 'partial', 'Validasi struktur file berjalan.');
     const importPlan = validateImportBlobPlan_(blob, lowerName, opts);
     updateImportBatchStatus_(tenantId, clinicId, importId, 'importing', 'partial', 'Validasi selesai. Import ' + importPlan.sheetCount + ' sheet / ' + importPlan.rowsRead + ' row berjalan.');
+    if (shouldQueueChunkedImport_(importPlan, opts)) {
+      result = queueChunkedImportFromBlob_(blob, lowerName, importPlan, importId, tenantId, clinicId, opts);
+      updateImportBatchStatus_(tenantId, clinicId, importId, 'queued', 'partial', 'Import besar masuk queue: ' + result.rowsRead + ' row menunggu worker.');
+      appendSyncLog_(tenantId, clinicId, importId, 'import_queue', sourceSystem, 'queued', now, new Date(), result.rowsRead, 0, 0, 'Queued for chunk worker.');
+      writeAudit_(opts.actorId || 'dashboard_upload', 'owner', 'import_chunk_queued', 'IMPORT_BATCH', { importId, fileName, rowsRead: result.rowsRead, targetSheet: result.targetSheet });
+      return Object.assign({ ok: true, importId, importStatus: 'queued', dataStatus: 'partial', message: 'Import besar masuk queue. Worker akan memproses bertahap.', job: getImportJobById_(tenantId, clinicId, importId) }, result);
+    }
     if (lowerName.endsWith('.csv') || String(blob.getContentType()).indexOf('csv') !== -1) {
       result = importCsvBlob_(blob, importId, tenantId, clinicId, opts);
     } else {
@@ -188,6 +195,55 @@ function validateImportBlobPlan_(blob, lowerName, options) {
     throw new Error('Upload Excel membutuhkan Advanced Google Service: Drive API. Enable Drive API di Apps Script Services, atau upload CSV untuk POC cepat.');
   }
   return { ok: true, fileType: 'xlsx', sheetCount: 1, rowsRead: 0, targets: [] };
+}
+
+function shouldQueueChunkedImport_(importPlan, options) {
+  if (options && options.forceChunkedImport === false) return false;
+  if (options && options.forceChunkedImport === true) return true;
+  if (!importPlan || importPlan.fileType !== 'csv') return false;
+  return Number(importPlan.rowsRead || 0) > Number(APP_CONFIG.importChunkRows || 500);
+}
+
+function queueChunkedImportFromBlob_(blob, lowerName, importPlan, importId, tenantId, clinicId, options) {
+  if (!importPlan || importPlan.fileType !== 'csv') throw new Error('Chunk worker MVP baru mendukung CSV.');
+  const values = Utilities.parseCsv(blob.getDataAsString());
+  const targetSheet = options.targetSheet || (importPlan.targets && importPlan.targets[0]);
+  const rows = tableValuesToObjects_(values);
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty('IMPORT_CHUNK_QUEUE_JSON') || '[]';
+  let queue = [];
+  try { queue = JSON.parse(raw) || []; } catch (err) { queue = []; }
+  queue = queue.filter(function(item) { return item && item.importId !== importId; });
+  queue.push({
+    importId: importId,
+    tenantId: tenantId,
+    clinicId: clinicId,
+    sourceSystem: options.sourceSystem || 'generic_excel',
+    sourceSheetName: 'CSV',
+    targetSheet: targetSheet,
+    rows: rows,
+    nextRowOffset: 0,
+    rowsRead: 0,
+    rowsWritten: 0,
+    rowsFailed: 0,
+    period: options.period || '',
+    status: 'queued',
+    chunkRows: Number(options.chunkRows || APP_CONFIG.importChunkRows || 500),
+    updatedAt: Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss'),
+  });
+  props.setProperty('IMPORT_CHUNK_QUEUE_JSON', JSON.stringify(queue));
+  installImportChunkWorkerTrigger_();
+  return { queued: true, rowsRead: rows.length, rowsWritten: 0, rowsFailed: 0, targetSheet: targetSheet, importedSheets: [{ targetSheet: targetSheet, rowsWritten: 0, rowsFailed: 0 }] };
+}
+
+function installImportChunkWorkerTrigger_() {
+  if (typeof ScriptApp === 'undefined' || !ScriptApp.newTrigger) return { ok: false, message: 'ScriptApp trigger API unavailable.' };
+  const existing = ScriptApp.getProjectTriggers().filter(function(trigger) {
+    return trigger.getHandlerFunction && trigger.getHandlerFunction() === 'runDefaultImportChunkWorker';
+  });
+  if (existing.length) return { ok: true, existing: true, count: existing.length };
+  const trigger = ScriptApp.newTrigger('runDefaultImportChunkWorker').timeBased().after(60 * 1000).create();
+  return { ok: true, triggerId: trigger.getUniqueId ? trigger.getUniqueId() : '' };
 }
 
 function runImportChunkWorker_() {
