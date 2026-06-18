@@ -76,10 +76,10 @@ If a file has both `gas/src/...` and `src/...` equivalents, `gas/src` wins until
 A versioned deployment was updated from the `hadi4us@gmail.com`-authorized clasp user on 2026-06-18.
 
 - Apps Script ID: `1-2IlwXdJ6jih3KRgO5cOHQon2zDnYGEq06gyXAa37wPGk4KE99Tgoaoy`
-- Version: `67` — `Retry-safe KPI compute jobs 2026-06-18`
+- Version: `68` — `Import status release + dashboard readiness bottom 2026-06-18`
 - Deployment ID: `AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag`
 - Web app URL: `https://script.google.com/macros/s/AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag/exec`
-- Readiness status: previous authenticated smoke test passed; latest terminal smoke was redirected to Google sign-in as expected for a login-required web app. Latest deployment keeps tenant isolation and adds compute-only retry for failed import jobs without writing transaction rows again.
+- Readiness status: previous authenticated smoke test passed; latest terminal smoke was redirected to Google sign-in as expected for a login-required web app. Latest deployment keeps tenant isolation, adds compute-only retry for failed import jobs without writing transaction rows again, splits import status notes, and moves tenant readiness to the bottom of the dashboard.
 
 The previous versioned deployment under `ccc19depok@gmail.com` was undeployed and must not be used.
 
