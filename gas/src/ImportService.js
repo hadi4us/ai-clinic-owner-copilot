@@ -13,6 +13,68 @@ function getDefaultImportJobPayload(limit) {
   return getImportJobPayloadForContext_(context, limit || 10);
 }
 
+function retryDefaultImportCompute(importId) {
+  const context = resolveRequestContext_({}, {}, 'finance');
+  return retryImportComputeForContext_(context, importId);
+}
+
+function retryImportComputeForContext_(context, importId) {
+  const normalizedImportId = String(importId || '').trim();
+  if (!normalizedImportId) throw new Error('Import ID wajib diisi.');
+  assertContextScope_(context, context.tenantId, context.clinicId);
+  return withTenantClinicLock_('retry_import_compute', context.tenantId, context.clinicId, function() {
+    const tenantId = context.tenantId;
+    const clinicId = context.clinicId;
+    const job = getImportJobById_(tenantId, clinicId, normalizedImportId);
+    if (!job) throw new Error('Import job tidak ditemukan untuk tenant/clinic aktif.');
+    if (!job.retryable) throw new Error(job.retryReason || 'Job ini tidak bisa di-retry tanpa upload ulang.');
+    const period = toPeriodString_(job.periodStart) || getLatestAvailablePeriodForScope_(tenantId, clinicId) || toPeriodString_(new Date());
+    const startedAt = new Date();
+    updateImportBatchStatus_(tenantId, clinicId, normalizedImportId, 'computing', job.dataStatus || 'partial', 'Retry compute KPI berjalan.');
+    try {
+      const kpi = computePocKpisNoLock_(tenantId, clinicId, period);
+      const validation = summarizeValidationByImport_(tenantId, clinicId)[normalizedImportId] || {};
+      const finalStatus = Number(validation.errorCount || 0) > 0 ? 'partial' : 'completed';
+      const finalDataStatus = finalStatus === 'partial' ? 'partial' : 'complete';
+      updateObjectsWhere_('IMPORT_BATCH', function(row) {
+        return row.tenant_id === tenantId && row.clinic_id === clinicId && row.import_id === normalizedImportId;
+      }, function(row) {
+        row.status = finalStatus;
+        row.data_status = finalDataStatus;
+        row.completed_at = new Date();
+        row.notes = 'KPI compute retry berhasil untuk periode ' + period + '.';
+        return row;
+      });
+      updateObjectsWhere_('IMPORT_FILE', function(row) {
+        return row.tenant_id === tenantId && row.clinic_id === clinicId && row.import_id === normalizedImportId;
+      }, function(row) {
+        row.status = 'completed';
+        return row;
+      });
+      appendSyncLog_(tenantId, clinicId, normalizedImportId, 'compute_retry', job.sourceSystem || 'generic_excel', 'success', startedAt, new Date(), job.rowsRead, job.rowsWritten, job.rowsFailed, '');
+      invalidateDashboardCache_(tenantId, clinicId, period);
+      writeAudit_(context.actorId || context.userEmail || 'dashboard_retry', context.role || 'finance', 'import_compute_retry', 'IMPORT_BATCH', {
+        importId: normalizedImportId,
+        period: period,
+        status: finalStatus,
+      });
+      return {
+        ok: true,
+        importId: normalizedImportId,
+        period: period,
+        status: finalStatus,
+        message: 'Compute KPI berhasil diulang tanpa menulis ulang transaksi.',
+        kpi: kpi,
+        job: getImportJobById_(tenantId, clinicId, normalizedImportId),
+      };
+    } catch (err) {
+      updateImportBatchStatus_(tenantId, clinicId, normalizedImportId, 'failed', 'partial', 'Retry compute KPI gagal: ' + (err.message || err));
+      appendSyncLog_(tenantId, clinicId, normalizedImportId, 'compute_retry', job.sourceSystem || 'generic_excel', 'failed', startedAt, new Date(), job.rowsRead, job.rowsWritten, job.rowsFailed, err.message || String(err));
+      throw new Error('Retry compute KPI gagal: ' + (err.message || err));
+    }
+  });
+}
+
 function getImportJobPayloadForContext_(context, limit) {
   const max = Math.max(1, Math.min(Number(limit || 10), 25));
   const tenantId = context.tenantId;
@@ -459,6 +521,9 @@ function buildImportJobRow_(batch, file, sync, validation) {
   const rowsRead = Number((sync && sync.rows_read) || (file && file.row_count) || 0);
   const rowsWritten = Number((sync && sync.rows_written) || 0);
   const rowsFailed = Number((sync && sync.rows_failed) || (validation && validation.errorCount) || 0);
+  const status = batch.status || (sync && sync.status) || 'unknown';
+  const failureText = [sync && sync.error_message, batch.notes].filter(Boolean).join(' ').toLowerCase();
+  const computeFailed = status === 'failed' && rowsWritten > 0 && failureText.indexOf('compute') !== -1;
   return {
     importId: batch.import_id || '',
     tenantId: batch.tenant_id || '',
@@ -467,7 +532,7 @@ function buildImportJobRow_(batch, file, sync, validation) {
     fileType: (file && file.file_type) || '',
     sourceSystem: batch.source_system || '',
     method: batch.import_method || '',
-    status: batch.status || (sync && sync.status) || 'unknown',
+    status: status,
     dataStatus: batch.data_status || '',
     periodStart: batch.period_start || '',
     periodEnd: batch.period_end || '',
@@ -478,6 +543,8 @@ function buildImportJobRow_(batch, file, sync, validation) {
     rowsRead: rowsRead,
     rowsWritten: rowsWritten,
     rowsFailed: rowsFailed,
+    retryable: computeFailed,
+    retryReason: computeFailed ? '' : (rowsWritten > 0 ? 'Retry otomatis hanya tersedia jika tahap compute KPI gagal.' : 'Belum ada transaksi yang berhasil ditulis; perbaiki file lalu upload ulang.'),
     validationCount: Number((validation && validation.count) || 0),
     validationErrors: (validation && validation.samples) || [],
     errorMessage: (sync && sync.error_message) || '',

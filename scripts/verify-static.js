@@ -94,6 +94,10 @@ assertIncludes('gas/src/Config.js', [
 assertIncludes('gas/src/ImportService.js', [
   'updateObjectsWhere_',
   'getDefaultImportJobPayload',
+  'retryDefaultImportCompute',
+  'retryImportComputeForContext_',
+  'compute_retry',
+  'retryable',
   'getImportJobPayloadForContext_',
   'appendImportJobStart_',
   'updateImportBatchStatus_',
@@ -196,6 +200,8 @@ assertIncludes('gas/src/Api.js', [
   'getGrowthAssistantPayloadForContext_',
   'importJobs',
   'getDefaultImportJobPayload',
+  'retryImportCompute',
+  'retryImportComputeForContext_',
 ]);
 
 assertIncludes('gas/src/GrowthAssistantService.js', [
@@ -242,6 +248,9 @@ assertIncludes('gas/src/Dashboard.html', [
   'tenantRegistryRows',
   'provisionTenant()',
   'Riwayat Import',
+  'Ulang Hitung',
+  'retryImportCompute',
+  'retryDefaultImportCompute',
   'loadImportJobs',
   'renderImportJobs',
   'getDefaultTenantAdminPayload',
@@ -293,7 +302,7 @@ for (const file of ['gas/src/Config.js', 'src/Core/Config.gs']) {
 
 const docs = read('docs/SOURCE_OF_TRUTH_AND_DEPLOYMENT.md');
 assert(docs.includes('A versioned deployment was updated from the `hadi4us@gmail.com`-authorized clasp user'), 'Docs must record the current hadi4us pilot deployment');
-assert(docs.includes('Version: `66`'), 'Docs must record the current versioned Apps Script version');
+assert(docs.includes('Version: `67`'), 'Docs must record the current versioned Apps Script version');
 assert(docs.includes('AKfycbyCYig7Fxz7eKyXYQL7UeAcZQJ4171fcPYL6ur-ixVdpHQ_S3w8OiHtqzaS1QqK7Oi9ag'), 'Docs must record the current versioned deployment ID');
 assert(docs.includes('All Google-side resources for this project must use `hadi4us@gmail.com`'), 'Docs must state hadi4us Google account policy');
 assert(docs.includes('Deprecated ccc19depok deployments'), 'Docs must record old deployment deprecation');

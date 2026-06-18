@@ -29,7 +29,7 @@ function doGet(e) {
     const context = resolveRequestContext_(params, {}, 'viewer');
     return jsonOutput_(getGrowthAssistantPayloadForContext_(context, params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
   }
-  if (['setup', 'compute', 'resetFixture', 'upload', 'manualInput', 'suggestCoa', 'approveCoaSuggestion', 'updateTransaction', 'deleteTransaction'].indexOf(action) !== -1) {
+  if (['setup', 'compute', 'resetFixture', 'upload', 'retryImportCompute', 'manualInput', 'suggestCoa', 'approveCoaSuggestion', 'updateTransaction', 'deleteTransaction'].indexOf(action) !== -1) {
     return jsonOutput_({ ok: false, error: 'MUTATING_GET_DISABLED', message: 'Action mutasi hanya tersedia via POST dengan token pilot.' });
   }
 
@@ -57,6 +57,11 @@ function doPost(e) {
     assertPilotMutationAllowed_(params, payload);
     const context = resolveRequestContext_(params, payload, 'finance');
     return jsonOutput_(computePocKpis(context.tenantId, context.clinicId, payload.period || params.period || getLatestAvailablePeriodForContext_(context) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM')));
+  }
+  if (action === 'retryImportCompute') {
+    assertPilotMutationAllowed_(params, payload);
+    const context = resolveRequestContext_(params, payload, 'finance');
+    return jsonOutput_(retryImportComputeForContext_(context, payload.importId || params.importId));
   }
   if (action === 'manualInput') {
     assertPilotMutationAllowed_(params, payload);

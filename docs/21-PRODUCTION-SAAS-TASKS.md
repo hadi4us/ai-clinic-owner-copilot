@@ -44,7 +44,7 @@ Status legend:
 
 - `[x]` Add import job state model.
 - `[~]` Split upload validation/import/compute steps.
-- `[ ]` Add retry-safe compute.
+- `[x]` Add retry-safe compute.
 - `[x]` Show job status in UI.
 - `[x]` Add job duration/error summary.
 
@@ -102,7 +102,8 @@ Status legend:
 - `[x]` Job summary includes file, status, row counts, duration, error message, and validation samples.
 - `[x]` Upload Data UI includes import history, KPI-style job counters, and validation/error notes.
 - `[ ]` Add trigger-backed chunk worker for large imports.
-- `[ ]` Add retry action for failed compute/import jobs.
+- `[x]` Add compute-only retry action for jobs whose transaction rows were already written.
+- `[x]` Prevent retry from re-importing rows or double-counting transactions.
 
 ## Current Slice - Tenant Onboarding Wizard
 

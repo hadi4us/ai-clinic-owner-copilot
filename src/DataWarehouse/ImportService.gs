@@ -13,6 +13,68 @@ function getDefaultImportJobPayload(limit) {
   return getImportJobPayloadForContext_(context, limit || 10);
 }
 
+function retryDefaultImportCompute(importId) {
+  const context = resolveRequestContext_({}, {}, 'finance');
+  return retryImportComputeForContext_(context, importId);
+}
+
+function retryImportComputeForContext_(context, importId) {
+  const normalizedImportId = String(importId || '').trim();
+  if (!normalizedImportId) throw new Error('Import ID wajib diisi.');
+  assertContextScope_(context, context.tenantId, context.clinicId);
+  return withTenantClinicLock_('retry_import_compute', context.tenantId, context.clinicId, function() {
+    const tenantId = context.tenantId;
+    const clinicId = context.clinicId;
+    const job = getImportJobById_(tenantId, clinicId, normalizedImportId);
+    if (!job) throw new Error('Import job tidak ditemukan untuk tenant/clinic aktif.');
+    if (!job.retryable) throw new Error(job.retryReason || 'Job ini tidak bisa di-retry tanpa upload ulang.');
+    const period = toPeriodString_(job.periodStart) || getLatestAvailablePeriodForScope_(tenantId, clinicId) || toPeriodString_(new Date());
+    const startedAt = new Date();
+    updateImportBatchStatus_(tenantId, clinicId, normalizedImportId, 'computing', job.dataStatus || 'partial', 'Retry compute KPI berjalan.');
+    try {
+      const kpi = computePocKpisNoLock_(tenantId, clinicId, period);
+      const validation = summarizeValidationByImport_(tenantId, clinicId)[normalizedImportId] || {};
+      const finalStatus = Number(validation.errorCount || 0) > 0 ? 'partial' : 'completed';
+      const finalDataStatus = finalStatus === 'partial' ? 'partial' : 'complete';
+      updateObjectsWhere_('IMPORT_BATCH', function(row) {
+        return row.tenant_id === tenantId && row.clinic_id === clinicId && row.import_id === normalizedImportId;
+      }, function(row) {
+        row.status = finalStatus;
+        row.data_status = finalDataStatus;
+        row.completed_at = new Date();
+        row.notes = 'KPI compute retry berhasil untuk periode ' + period + '.';
+        return row;
+      });
+      updateObjectsWhere_('IMPORT_FILE', function(row) {
+        return row.tenant_id === tenantId && row.clinic_id === clinicId && row.import_id === normalizedImportId;
+      }, function(row) {
+        row.status = 'completed';
+        return row;
+      });
+      appendSyncLog_(tenantId, clinicId, normalizedImportId, 'compute_retry', job.sourceSystem || 'generic_excel', 'success', startedAt, new Date(), job.rowsRead, job.rowsWritten, job.rowsFailed, '');
+      invalidateDashboardCache_(tenantId, clinicId, period);
+      writeAudit_(context.actorId || context.userEmail || 'dashboard_retry', context.role || 'finance', 'import_compute_retry', 'IMPORT_BATCH', {
+        importId: normalizedImportId,
+        period: period,
+        status: finalStatus,
+      });
+      return {
+        ok: true,
+        importId: normalizedImportId,
+        period: period,
+        status: finalStatus,
+        message: 'Compute KPI berhasil diulang tanpa menulis ulang transaksi.',
+        kpi: kpi,
+        job: getImportJobById_(tenantId, clinicId, normalizedImportId),
+      };
+    } catch (err) {
+      updateImportBatchStatus_(tenantId, clinicId, normalizedImportId, 'failed', 'partial', 'Retry compute KPI gagal: ' + (err.message || err));
+      appendSyncLog_(tenantId, clinicId, normalizedImportId, 'compute_retry', job.sourceSystem || 'generic_excel', 'failed', startedAt, new Date(), job.rowsRead, job.rowsWritten, job.rowsFailed, err.message || String(err));
+      throw new Error('Retry compute KPI gagal: ' + (err.message || err));
+    }
+  });
+}
+
 function getImportJobPayloadForContext_(context, limit) {
   const max = Math.max(1, Math.min(Number(limit || 10), 25));
   const tenantId = context.tenantId;
@@ -127,6 +189,8 @@ function importExcelBlob_(blob, importId, tenantId, clinicId, options) {
   let rowsRead = 0;
   let rowsWritten = 0;
   let rowsFailed = 0;
+  let coaSuggestionCount = 0;
+  let coaReviewCount = 0;
 
   const sheets = tempSpreadsheet.getSheets();
   assertImportSheetLimit_(sheets.length);
@@ -142,11 +206,13 @@ function importExcelBlob_(blob, importId, tenantId, clinicId, options) {
     rowsRead += result.rowsRead;
     rowsWritten += result.rowsWritten;
     rowsFailed += result.rowsFailed;
+    coaSuggestionCount += Number(result.coaSuggestionCount || 0);
+    coaReviewCount += Number(result.coaReviewCount || 0);
     imported.push({ sourceSheet: sheet.getName(), targetSheet, rowsWritten: result.rowsWritten, rowsFailed: result.rowsFailed });
   });
 
   try { Drive.Files.trash(tempFile.id); } catch (err) {}
-  return { rowsRead, rowsWritten, rowsFailed, importedSheets: imported };
+  return { rowsRead, rowsWritten, rowsFailed, coaSuggestionCount, coaReviewCount, importedSheets: imported };
 }
 
 function tableValuesToObjects_(values) {
@@ -164,6 +230,8 @@ function importObjectRowsToFinalSheet_(targetSheet, sourceRows, importId, tenant
   let rowsFailed = 0;
   const rawRows = [];
   const finalRows = [];
+  const coaSuggestionRows = [];
+  const coaContext = { tenantId, clinicId };
   const seenPayloadHashes = {};
   rows.forEach((sourceRow, index) => {
     const sourceRowId = `${sourceSheetName || targetSheet}_${index + 1}`;
@@ -195,19 +263,27 @@ function importObjectRowsToFinalSheet_(targetSheet, sourceRows, importId, tenant
       imported_at: new Date(),
     });
 
-    const mapped = mapGenericRowToFinalSheet_(targetSheet, sourceRow, importId, tenantId, clinicId, sourceRowId, index);
+    const mapped = applyCoaSuggestionToFinalRow_(coaContext, mapGenericRowToFinalSheet_(targetSheet, sourceRow, importId, tenantId, clinicId, sourceRowId, index), targetSheet);
     const validation = validateFinalRow_(targetSheet, mapped, index + 2);
     if (!validation.ok) {
       rowsFailed++;
       validation.errors.forEach(err => appendValidationLog_(tenantId, clinicId, importId, targetSheet, err.rowNumber, err.columnName, 'error', err.issueType, err.message, err.sourceValue, err.normalizedValue));
       return;
     }
+    if (mapped._coaSuggestionAudit) {
+      coaSuggestionRows.push(mapped._coaSuggestionAudit);
+      delete mapped._coaSuggestionAudit;
+    } else {
+      const auditRow = buildImportedCoaSuggestionRow_(coaContext, mapped, targetSheet);
+      if (auditRow) coaSuggestionRows.push(auditRow);
+    }
     finalRows.push(mapped);
   });
 
   appendObjects_('RAW_IMPORT', rawRows);
   appendObjects_(targetSheet, finalRows);
-  return { rowsRead: rows.length, rowsWritten: finalRows.length, rowsFailed, importedSheets: [{ targetSheet, rowsWritten: finalRows.length, rowsFailed }] };
+  appendObjects_('AI_COA_SUGGESTION', coaSuggestionRows);
+  return { rowsRead: rows.length, rowsWritten: finalRows.length, rowsFailed, coaSuggestionCount: coaSuggestionRows.length, coaReviewCount: coaSuggestionRows.filter(function(row) { return String(row.review_status || '') === 'pending_review'; }).length, importedSheets: [{ targetSheet, rowsWritten: finalRows.length, rowsFailed, coaSuggestionCount: coaSuggestionRows.length, coaReviewCount: coaSuggestionRows.filter(function(row) { return String(row.review_status || '') === 'pending_review'; }).length }] };
 }
 
 function mapGenericRowToFinalSheet_(targetSheet, row, importId, tenantId, clinicId, sourceRowId, index) {
@@ -216,38 +292,51 @@ function mapGenericRowToFinalSheet_(targetSheet, row, importId, tenantId, clinic
   if (targetSheet === 'KUNJUNGAN') return {
     tenant_id: tenantId, clinic_id: clinicId, visit_id: getFirst_(src, ['visit_id', 'id_kunjungan']) || `visit_${importId}_${index + 1}`,
     source_visit_id: getFirst_(src, ['source_visit_id', 'visit_id', 'id_kunjungan']) || '', import_id: importId, source_row_id: sourceRowId,
-    visit_date: toIsoDateString_(getFirst_(src, ['visit_date', 'tanggal', 'tanggal_kunjungan', 'transaction_date'])), registration_time: '',
-    patient_ref: getFirst_(src, ['patient_ref', 'pasien_ref']) || '', patient_type: getFirst_(src, ['patient_type', 'jenis_pasien']) || '', payer_type: getFirst_(src, ['payer_type', 'penjamin']) || '',
+    visit_date: toIsoDateString_(getFirst_(src, ['visit_date', 'tanggal', 'tanggal_kunjungan', 'transaction_date'])), registration_time: getFirst_(src, ['registration_time', 'jam_registrasi']) || '',
+    patient_ref: getFirst_(src, ['patient_ref', 'pasien_ref', 'kode_pasien_anonim']) || '', patient_type: getFirst_(src, ['patient_type', 'jenis_pasien', 'status_pasien']) || '', payer_type: getFirst_(src, ['payer_type', 'penjamin', 'jenis_pasienpenjamin']) || '',
     doctor_id: normalizeDoctorId_(getFirst_(src, ['doctor_id', 'dokter', 'nama_dokter'])), poli_id: normalizePoliId_(getFirst_(src, ['poli_id', 'poli', 'nama_poli'])),
-    service_category: getFirst_(src, ['service_category', 'kategori_layanan']) || '', service_name: getFirst_(src, ['service_name', 'layanan']) || '',
-    status: getFirst_(src, ['status']) || 'completed', data_status: 'complete', created_at: now, updated_at: now,
+    service_category: getFirst_(src, ['service_category', 'kategori_layanan', 'tipe_kunjungan']) || '', service_name: getFirst_(src, ['service_name', 'layanan', 'nama_layanan', 'tujuan_kunjunganlayanan_administratif', 'tujuan_kunjungan']) || '',
+    status: getFirst_(src, ['status', 'status_kunjungan']) || 'completed', data_status: getFirst_(src, ['data_status', 'status_data']) || 'complete', created_at: now, updated_at: now,
   };
   if (targetSheet === 'TINDAKAN') return {
     tenant_id: tenantId, clinic_id: clinicId, procedure_id: getFirst_(src, ['procedure_id', 'tindakan_id']) || `proc_${importId}_${index + 1}`,
     source_procedure_id: getFirst_(src, ['source_procedure_id', 'procedure_id', 'tindakan_id']) || '', import_id: importId, source_row_id: sourceRowId,
     visit_id: getFirst_(src, ['visit_id', 'id_kunjungan']) || '', doctor_id: normalizeDoctorId_(getFirst_(src, ['doctor_id', 'dokter', 'nama_dokter'])), poli_id: normalizePoliId_(getFirst_(src, ['poli_id', 'poli', 'nama_poli'])),
-    procedure_date: toIsoDateString_(getFirst_(src, ['procedure_date', 'tanggal', 'tanggal_tindakan', 'transaction_date'])), procedure_category: getFirst_(src, ['procedure_category', 'kategori']) || 'tindakan',
-    procedure_name: getFirst_(src, ['procedure_name', 'tindakan', 'layanan', 'item_name']) || 'Tindakan', quantity: asNumber_(getFirst_(src, ['quantity', 'qty']), 1),
-    unit_price: asNumber_(getFirst_(src, ['unit_price', 'harga']), 0), gross_amount: asNumber_(getFirst_(src, ['gross_amount', 'amount', 'nilai']), 0), discount_amount: asNumber_(getFirst_(src, ['discount_amount', 'diskon']), 0), net_amount: asNumber_(getFirst_(src, ['net_amount', 'amount', 'nilai']), 0), status: 'active', created_at: now,
+    procedure_date: toIsoDateString_(getFirst_(src, ['procedure_date', 'tanggal', 'tanggal_tindakan', 'transaction_date'])), procedure_category: getFirst_(src, ['procedure_category', 'kategori', 'kategori_tindakan']) || 'tindakan',
+    procedure_name: getFirst_(src, ['procedure_name', 'tindakan', 'layanan', 'item_name', 'nama_tindakan']) || 'Tindakan', quantity: asNumber_(getFirst_(src, ['quantity', 'qty', 'jumlah']), 1),
+    unit_price: asNumber_(getFirst_(src, ['unit_price', 'harga', 'harga_satuan']), 0), gross_amount: asNumber_(getFirst_(src, ['gross_amount', 'amount', 'nilai', 'pendapatan_kotor']), 0), discount_amount: asNumber_(getFirst_(src, ['discount_amount', 'diskon']), 0), net_amount: asNumber_(getFirst_(src, ['net_amount', 'amount', 'nilai', 'pendapatan_bersih']), 0), status: 'active', created_at: now,
   };
   if (targetSheet === 'RESEP') return {
     tenant_id: tenantId, clinic_id: clinicId, prescription_id: getFirst_(src, ['prescription_id', 'resep_id']) || `rx_${importId}_${index + 1}`,
     source_prescription_id: getFirst_(src, ['source_prescription_id', 'prescription_id', 'resep_id']) || '', import_id: importId, source_row_id: sourceRowId,
     visit_id: getFirst_(src, ['visit_id', 'id_kunjungan']) || '', medicine_id: normalizeId_('med_', getFirst_(src, ['medicine_id', 'kode_obat', 'item_code', 'item_name', 'obat'])),
-    prescription_date: toIsoDateString_(getFirst_(src, ['prescription_date', 'tanggal', 'tanggal_resep', 'transaction_date'])), item_name: getFirst_(src, ['item_name', 'obat', 'medicine_name', 'nama_obat']) || 'Obat',
-    quantity: asNumber_(getFirst_(src, ['quantity', 'qty']), 0), unit: getFirst_(src, ['unit', 'satuan']) || '', unit_price: asNumber_(getFirst_(src, ['unit_price', 'harga_jual']), 0),
-    gross_amount: asNumber_(getFirst_(src, ['gross_amount', 'amount', 'nilai']), 0), discount_amount: asNumber_(getFirst_(src, ['discount_amount', 'diskon']), 0), net_amount: asNumber_(getFirst_(src, ['net_amount', 'amount', 'nilai']), 0), cogs_amount: asNumber_(getFirst_(src, ['cogs_amount', 'hpp', 'modal']), 0), batch_no: getFirst_(src, ['batch_no', 'batch']) || '', status: 'active', created_at: now,
+    prescription_date: toIsoDateString_(getFirst_(src, ['prescription_date', 'tanggal', 'tanggal_resep', 'transaction_date'])), item_name: getFirst_(src, ['item_name', 'obat', 'medicine_name', 'nama_obat', 'nama_obatitem']) || 'Obat',
+    quantity: asNumber_(getFirst_(src, ['quantity', 'qty', 'jumlah']), 0), unit: getFirst_(src, ['unit', 'satuan']) || '', unit_price: asNumber_(getFirst_(src, ['unit_price', 'harga_jual', 'harga_satuan']), 0),
+    gross_amount: asNumber_(getFirst_(src, ['gross_amount', 'amount', 'nilai', 'pendapatan_kotor']), 0), discount_amount: asNumber_(getFirst_(src, ['discount_amount', 'diskon']), 0), net_amount: asNumber_(getFirst_(src, ['net_amount', 'amount', 'nilai', 'pendapatan_bersih']), 0), cogs_amount: asNumber_(getFirst_(src, ['cogs_amount', 'hpp', 'modal', 'hppmodal']), 0), batch_no: getFirst_(src, ['batch_no', 'batch']) || '', status: 'active', created_at: now,
   };
   if (targetSheet === 'BIAYA') return {
     tenant_id: tenantId, clinic_id: clinicId, expense_id: getFirst_(src, ['expense_id', 'biaya_id']) || `exp_${importId}_${index + 1}`,
     import_id: importId, source_row_id: sourceRowId, expense_date: toIsoDateString_(getFirst_(src, ['expense_date', 'tanggal', 'tanggal_biaya', 'transaction_date'])),
-    expense_category: getFirst_(src, ['expense_category', 'kategori_biaya', 'kategori']) || 'operasional', expense_name: getFirst_(src, ['expense_name', 'nama_biaya', 'keterangan', 'item_name']) || 'Biaya',
-    account_id: getFirst_(src, ['account_id', 'coa']) || '', amount: asNumber_(getFirst_(src, ['amount', 'nilai', 'nominal']), 0), payment_method: getFirst_(src, ['payment_method', 'metode_bayar']) || '', vendor_name: getFirst_(src, ['vendor_name', 'vendor', 'supplier']) || '', related_visit_id: getFirst_(src, ['related_visit_id', 'visit_id']) || '', related_item_code: getFirst_(src, ['related_item_code', 'item_code']) || '', cost_type: getFirst_(src, ['cost_type', 'jenis_biaya']) || 'operational', allocation_target: getFirst_(src, ['allocation_target', 'alokasi']) || 'clinic', allocation_id: getFirst_(src, ['allocation_id']) || clinicId, status: 'paid', trace_status: 'traceable', created_at: now,
+    expense_category: getFirst_(src, ['expense_category', 'kategori_biaya', 'kategori']) || 'operasional', expense_name: getFirst_(src, ['expense_name', 'nama_biaya', 'keterangan', 'item_name', 'nama_biayaketerangan']) || 'Biaya',
+    account_id: getFirst_(src, ['account_id', 'coa']) || '', amount: asNumber_(getFirst_(src, ['amount', 'nilai', 'nominal']), 0), payment_method: getFirst_(src, ['payment_method', 'metode_bayar']) || '', vendor_name: getFirst_(src, ['vendor_name', 'vendor', 'supplier', 'vendorsupplier']) || '', related_visit_id: getFirst_(src, ['related_visit_id', 'visit_id']) || '', related_item_code: getFirst_(src, ['related_item_code', 'item_code']) || '', cost_type: getFirst_(src, ['cost_type', 'jenis_biaya']) || 'operational', allocation_target: getFirst_(src, ['allocation_target', 'alokasi']) || 'clinic', allocation_id: getFirst_(src, ['allocation_id']) || clinicId, status: 'paid', trace_status: 'traceable', created_at: now,
   };
+  if (targetSheet === 'PAJAK') {
+    const period = String(getFirst_(src, ['tax_period', 'masa_pajak', 'periode']) || '').slice(0, 7) || toPeriodString_(getFirst_(src, ['tanggal', 'date'])) || Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM');
+    const payable = asNumber_(getFirst_(src, ['tax_payable', 'pajak_terutang', 'amount', 'nilai']), 0);
+    const paid = asNumber_(getFirst_(src, ['tax_paid', 'pajak_dibayar']), 0);
+    return {
+      tenant_id: tenantId, clinic_id: clinicId, tax_id: getFirst_(src, ['tax_id', 'id_pajak']) || `tax_${importId}_${index + 1}`,
+      import_id: importId, tax_period: period, tax_type: getFirst_(src, ['tax_type', 'jenis_pajak']) || 'Pajak manual',
+      taxable_revenue: asNumber_(getFirst_(src, ['taxable_revenue', 'omzet_kena_pajak']), 0), non_taxable_revenue: asNumber_(getFirst_(src, ['non_taxable_revenue', 'omzet_tidak_kena_pajak']), 0),
+      tax_base_amount: asNumber_(getFirst_(src, ['tax_base_amount', 'dppdasar_pengenaan_pajak', 'dpp']), 0), tax_rate: asNumber_(getFirst_(src, ['tax_rate', 'tarif_pajak']), 0),
+      tax_payable: payable, tax_paid: paid, tax_outstanding: Math.max(0, payable - paid), document_status: getFirst_(src, ['document_status', 'status_dokumen']) || 'draft',
+      risk_flag: getFirst_(src, ['risk_flag']) || 'review_required', reconciliation_gap: asNumber_(getFirst_(src, ['reconciliation_gap']), 0), notes: getFirst_(src, ['notes', 'catatan_pajak', 'catatan']) || '', created_at: now, updated_at: now,
+    };
+  }
   return {
     tenant_id: tenantId, clinic_id: clinicId, revenue_id: getFirst_(src, ['revenue_id', 'pendapatan_id']) || `rev_${importId}_${index + 1}`,
     transaction_id: getFirst_(src, ['transaction_id', 'invoice', 'no_transaksi']) || `trx_${importId}_${index + 1}`,
-    import_id: importId, source_row_id: sourceRowId, visit_id: getFirst_(src, ['visit_id', 'id_kunjungan']) || '', doctor_id: normalizeDoctorId_(getFirst_(src, ['doctor_id', 'dokter', 'nama_dokter'])), poli_id: normalizePoliId_(getFirst_(src, ['poli_id', 'poli', 'nama_poli'])), transaction_date: toIsoDateString_(getFirst_(src, ['transaction_date', 'tanggal', 'tanggal_transaksi'])), revenue_type: getFirst_(src, ['revenue_type', 'jenis_pendapatan', 'kategori']) || 'tindakan', item_code: getFirst_(src, ['item_code', 'kode_item']) || '', item_name: getFirst_(src, ['item_name', 'layanan', 'tindakan', 'nama_item']) || 'Pendapatan', quantity: asNumber_(getFirst_(src, ['quantity', 'qty']), 1), unit_price: asNumber_(getFirst_(src, ['unit_price', 'harga']), 0), gross_amount: asNumber_(getFirst_(src, ['gross_amount', 'amount', 'nilai']), 0), discount_amount: asNumber_(getFirst_(src, ['discount_amount', 'diskon']), 0), net_amount: asNumber_(getFirst_(src, ['net_amount', 'amount', 'nilai']), 0), paid_amount: asNumber_(getFirst_(src, ['paid_amount', 'terbayar']), 0), receivable_amount: asNumber_(getFirst_(src, ['receivable_amount', 'piutang']), 0), payment_method: getFirst_(src, ['payment_method', 'metode_bayar']) || '', payer_type: getFirst_(src, ['payer_type', 'penjamin']) || '', cashier: getFirst_(src, ['cashier', 'kasir']) || '', status: getFirst_(src, ['status']) || 'paid', trace_status: 'traceable', created_at: now,
+    import_id: importId, source_row_id: sourceRowId, visit_id: getFirst_(src, ['visit_id', 'id_kunjungan']) || '', doctor_id: normalizeDoctorId_(getFirst_(src, ['doctor_id', 'dokter', 'nama_dokter'])), poli_id: normalizePoliId_(getFirst_(src, ['poli_id', 'poli', 'nama_poli'])), transaction_date: toIsoDateString_(getFirst_(src, ['transaction_date', 'tanggal', 'tanggal_transaksi'])), revenue_type: getFirst_(src, ['revenue_type', 'jenis_pendapatan', 'kategori']) || 'tindakan', item_code: getFirst_(src, ['item_code', 'kode_item']) || '', item_name: getFirst_(src, ['item_name', 'layanan', 'tindakan', 'nama_item', 'nama_layananitem']) || 'Pendapatan', quantity: asNumber_(getFirst_(src, ['quantity', 'qty', 'jumlah']), 1), unit_price: asNumber_(getFirst_(src, ['unit_price', 'harga', 'harga_satuan']), 0), gross_amount: asNumber_(getFirst_(src, ['gross_amount', 'amount', 'nilai', 'pendapatan_kotor']), 0), discount_amount: asNumber_(getFirst_(src, ['discount_amount', 'diskon']), 0), net_amount: asNumber_(getFirst_(src, ['net_amount', 'amount', 'nilai', 'pendapatan_bersih']), 0), paid_amount: asNumber_(getFirst_(src, ['paid_amount', 'terbayar']), 0), receivable_amount: asNumber_(getFirst_(src, ['receivable_amount', 'piutang']), 0), payment_method: getFirst_(src, ['payment_method', 'metode_bayar']) || '', payer_type: getFirst_(src, ['payer_type', 'penjamin', 'jenis_pasienpenjamin']) || '', cashier: getFirst_(src, ['cashier', 'kasir']) || '', status: getFirst_(src, ['status']) || 'paid', trace_status: 'traceable', created_at: now,
   };
 }
 
@@ -268,6 +357,7 @@ function getFirst_(row, keys) {
 
 function detectTargetSheetFromHeaders_(headers) {
   const keys = (headers || []).map(normalizeHeaderKey_).join('|');
+  if (keys.indexOf('pajak') !== -1 || keys.indexOf('tax') !== -1 || keys.indexOf('masa_pajak') !== -1) return 'PAJAK';
   if (keys.indexOf('expense') !== -1 || keys.indexOf('biaya') !== -1 || keys.indexOf('nominal') !== -1) return 'BIAYA';
   if (keys.indexOf('prescription') !== -1 || keys.indexOf('resep') !== -1 || keys.indexOf('obat') !== -1) return 'RESEP';
   if (keys.indexOf('procedure') !== -1 || keys.indexOf('tindakan') !== -1) return 'TINDAKAN';
@@ -283,6 +373,7 @@ function validateFinalRow_(targetSheet, row, rowNumber) {
     RESEP: ['tenant_id', 'clinic_id', 'prescription_id', 'prescription_date', 'item_name', 'net_amount'],
     PENDAPATAN: ['tenant_id', 'clinic_id', 'revenue_id', 'transaction_id', 'transaction_date', 'net_amount'],
     BIAYA: ['tenant_id', 'clinic_id', 'expense_id', 'expense_date', 'expense_category', 'amount'],
+    PAJAK: ['tenant_id', 'clinic_id', 'tax_id', 'tax_period', 'tax_type', 'tax_payable'],
   }[targetSheet] || ['tenant_id', 'clinic_id'];
   const errors = [];
   required.forEach(field => {
@@ -430,6 +521,9 @@ function buildImportJobRow_(batch, file, sync, validation) {
   const rowsRead = Number((sync && sync.rows_read) || (file && file.row_count) || 0);
   const rowsWritten = Number((sync && sync.rows_written) || 0);
   const rowsFailed = Number((sync && sync.rows_failed) || (validation && validation.errorCount) || 0);
+  const status = batch.status || (sync && sync.status) || 'unknown';
+  const failureText = [sync && sync.error_message, batch.notes].filter(Boolean).join(' ').toLowerCase();
+  const computeFailed = status === 'failed' && rowsWritten > 0 && failureText.indexOf('compute') !== -1;
   return {
     importId: batch.import_id || '',
     tenantId: batch.tenant_id || '',
@@ -438,7 +532,7 @@ function buildImportJobRow_(batch, file, sync, validation) {
     fileType: (file && file.file_type) || '',
     sourceSystem: batch.source_system || '',
     method: batch.import_method || '',
-    status: batch.status || (sync && sync.status) || 'unknown',
+    status: status,
     dataStatus: batch.data_status || '',
     periodStart: batch.period_start || '',
     periodEnd: batch.period_end || '',
@@ -449,6 +543,8 @@ function buildImportJobRow_(batch, file, sync, validation) {
     rowsRead: rowsRead,
     rowsWritten: rowsWritten,
     rowsFailed: rowsFailed,
+    retryable: computeFailed,
+    retryReason: computeFailed ? '' : (rowsWritten > 0 ? 'Retry otomatis hanya tersedia jika tahap compute KPI gagal.' : 'Belum ada transaksi yang berhasil ditulis; perbaiki file lalu upload ulang.'),
     validationCount: Number((validation && validation.count) || 0),
     validationErrors: (validation && validation.samples) || [],
     errorMessage: (sync && sync.error_message) || '',
