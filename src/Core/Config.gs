@@ -25,6 +25,7 @@ const APP_CONFIG = {
     maxImportSheets: 8,
     importChunkRows: 500,
     importChunkMaxRuntimeMs: 240000,
+    importChunkMaxRetries: 3,
     dashboardCacheTtlSeconds: 120,
   }),
 
@@ -78,6 +79,7 @@ APP_CONFIG.maxImportRows = APP_CONFIG.runtime.maxImportRows;
 APP_CONFIG.maxImportSheets = APP_CONFIG.runtime.maxImportSheets;
 APP_CONFIG.importChunkRows = APP_CONFIG.runtime.importChunkRows;
 APP_CONFIG.importChunkMaxRuntimeMs = APP_CONFIG.runtime.importChunkMaxRuntimeMs;
+APP_CONFIG.importChunkMaxRetries = APP_CONFIG.runtime.importChunkMaxRetries;
 APP_CONFIG.dashboardCacheTtlSeconds = APP_CONFIG.runtime.dashboardCacheTtlSeconds;
 Object.freeze(APP_CONFIG);
 

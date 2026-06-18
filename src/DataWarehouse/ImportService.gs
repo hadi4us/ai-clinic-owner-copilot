@@ -272,35 +272,57 @@ function runImportChunkWorker_() {
   const tenantId = job.tenantId || APP_CONFIG.defaultTenantId;
   const clinicId = job.clinicId || APP_CONFIG.defaultClinicId;
   return withTenantClinicLock_('import_chunk_worker', tenantId, clinicId, function() {
-    updateImportBatchStatus_(tenantId, clinicId, job.importId, 'running', 'partial', 'Chunk import berjalan mulai row ' + (Number(job.nextRowOffset || 0) + 1) + '.');
-    const rows = job.rows || [];
-    const targetSheet = job.targetSheet;
-    const start = Number(job.nextRowOffset || 0);
-    const end = Math.min(rows.length, start + chunkRows);
-    const result = importObjectRowsToFinalSheet_(targetSheet, rows.slice(start, end), job.importId, tenantId, clinicId, job.sourceSheetName || 'CHUNK');
-    job.nextRowOffset = end;
-    job.rowsRead = Number(job.rowsRead || 0) + result.rowsRead;
-    job.rowsWritten = Number(job.rowsWritten || 0) + result.rowsWritten;
-    job.rowsFailed = Number(job.rowsFailed || 0) + result.rowsFailed;
-    job.updatedAt = Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss');
-    if (job.nextRowOffset < rows.length && (new Date().getTime() - startedAt.getTime()) < maxRuntimeMs) {
-      job.status = 'waiting';
-      updateImportBatchStatus_(tenantId, clinicId, job.importId, 'waiting', 'partial', 'Chunk import menunggu trigger berikutnya: ' + job.nextRowOffset + '/' + rows.length + ' row.');
-      appendSyncLog_(tenantId, clinicId, job.importId, 'import_chunk', job.sourceSystem || 'generic_excel', 'waiting', startedAt, new Date(), result.rowsRead, result.rowsWritten, result.rowsFailed, 'Chunk selesai, masih ada row tersisa.');
-      installImportChunkWorkerTrigger_();
-    } else {
-      job.status = 'computing';
-      updateImportBatchStatus_(tenantId, clinicId, job.importId, 'computing', 'partial', 'Semua chunk selesai. Compute KPI berjalan.');
-      const period = job.period || inferImportPeriodForScope_(tenantId, clinicId) || toPeriodString_(new Date());
-      computePocKpisNoLock_(tenantId, clinicId, period);
-      invalidateDashboardCache_(tenantId, clinicId, period);
-      updateImportBatchStatus_(tenantId, clinicId, job.importId, job.rowsFailed > 0 ? 'partial' : 'completed', job.rowsFailed > 0 ? 'partial' : 'complete', 'Chunk import selesai: ' + job.rowsWritten + ' row tertulis.');
-      appendSyncLog_(tenantId, clinicId, job.importId, 'import_chunk', job.sourceSystem || 'generic_excel', 'success', startedAt, new Date(), job.rowsRead, job.rowsWritten, job.rowsFailed, '');
-      job.status = 'completed';
-      dedupeImportChunkWorkerTriggers_();
+    try {
+      updateImportBatchStatus_(tenantId, clinicId, job.importId, 'running', 'partial', 'Chunk import berjalan mulai row ' + (Number(job.nextRowOffset || 0) + 1) + '.');
+      const rows = job.rows || [];
+      const targetSheet = job.targetSheet;
+      const start = Number(job.nextRowOffset || 0);
+      const end = Math.min(rows.length, start + chunkRows);
+      const result = importObjectRowsToFinalSheet_(targetSheet, rows.slice(start, end), job.importId, tenantId, clinicId, job.sourceSheetName || 'CHUNK');
+      job.nextRowOffset = end;
+      job.rowsRead = Number(job.rowsRead || 0) + result.rowsRead;
+      job.rowsWritten = Number(job.rowsWritten || 0) + result.rowsWritten;
+      job.rowsFailed = Number(job.rowsFailed || 0) + result.rowsFailed;
+      job.retryCount = 0;
+      job.lastError = '';
+      job.updatedAt = Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss');
+      if (job.nextRowOffset < rows.length && (new Date().getTime() - startedAt.getTime()) < maxRuntimeMs) {
+        job.status = 'waiting';
+        updateImportBatchStatus_(tenantId, clinicId, job.importId, 'waiting', 'partial', 'Chunk import menunggu trigger berikutnya: ' + job.nextRowOffset + '/' + rows.length + ' row.');
+        appendSyncLog_(tenantId, clinicId, job.importId, 'import_chunk', job.sourceSystem || 'generic_excel', 'waiting', startedAt, new Date(), result.rowsRead, result.rowsWritten, result.rowsFailed, 'Chunk selesai, masih ada row tersisa.');
+        installImportChunkWorkerTrigger_();
+      } else {
+        job.status = 'computing';
+        updateImportBatchStatus_(tenantId, clinicId, job.importId, 'computing', 'partial', 'Semua chunk selesai. Compute KPI berjalan.');
+        const period = job.period || inferImportPeriodForScope_(tenantId, clinicId) || toPeriodString_(new Date());
+        computePocKpisNoLock_(tenantId, clinicId, period);
+        invalidateDashboardCache_(tenantId, clinicId, period);
+        updateImportBatchStatus_(tenantId, clinicId, job.importId, job.rowsFailed > 0 ? 'partial' : 'completed', job.rowsFailed > 0 ? 'partial' : 'complete', 'Chunk import selesai: ' + job.rowsWritten + ' row tertulis.');
+        appendSyncLog_(tenantId, clinicId, job.importId, 'import_chunk', job.sourceSystem || 'generic_excel', 'success', startedAt, new Date(), job.rowsRead, job.rowsWritten, job.rowsFailed, '');
+        job.status = 'completed';
+        dedupeImportChunkWorkerTriggers_();
+      }
+      props.setProperty('IMPORT_CHUNK_QUEUE_JSON', JSON.stringify(queue));
+      return { ok: true, importId: job.importId, status: job.status, nextRowOffset: job.nextRowOffset, rowsRead: job.rowsRead, rowsWritten: job.rowsWritten, rowsFailed: job.rowsFailed };
+    } catch (err) {
+      const message = err.message || String(err);
+      job.retryCount = Number(job.retryCount || 0) + 1;
+      job.lastError = message;
+      job.updatedAt = Utilities.formatDate(new Date(), APP_CONFIG.timezone, 'yyyy-MM-dd HH:mm:ss');
+      if (job.retryCount >= Number(APP_CONFIG.importChunkMaxRetries || 3)) {
+        job.status = 'failed';
+        updateImportBatchStatus_(tenantId, clinicId, job.importId, 'failed', 'partial', 'Chunk worker gagal setelah ' + job.retryCount + ' retry: ' + message);
+        appendSyncLog_(tenantId, clinicId, job.importId, 'import_chunk', job.sourceSystem || 'generic_excel', 'failed', startedAt, new Date(), job.rowsRead || 0, job.rowsWritten || 0, job.rowsFailed || 0, message);
+        dedupeImportChunkWorkerTriggers_();
+      } else {
+        job.status = 'waiting';
+        updateImportBatchStatus_(tenantId, clinicId, job.importId, 'waiting', 'partial', 'Chunk worker retry ' + job.retryCount + '/' + Number(APP_CONFIG.importChunkMaxRetries || 3) + ': ' + message);
+        appendSyncLog_(tenantId, clinicId, job.importId, 'import_chunk', job.sourceSystem || 'generic_excel', 'retry', startedAt, new Date(), job.rowsRead || 0, job.rowsWritten || 0, job.rowsFailed || 0, message);
+        installImportChunkWorkerTrigger_();
+      }
+      props.setProperty('IMPORT_CHUNK_QUEUE_JSON', JSON.stringify(queue));
+      return { ok: false, importId: job.importId, status: job.status, retryCount: job.retryCount, lastError: job.lastError };
     }
-    props.setProperty('IMPORT_CHUNK_QUEUE_JSON', JSON.stringify(queue));
-    return { ok: true, importId: job.importId, status: job.status, nextRowOffset: job.nextRowOffset, rowsRead: job.rowsRead, rowsWritten: job.rowsWritten, rowsFailed: job.rowsFailed };
   });
 }
 
