@@ -96,7 +96,7 @@ function getDefaultAuthState() {
 }
 
 
-function loginDefaultPasswordSession(username, password) {
+function loginDefaultPasswordSession(username, password, captchaAnswer) {
   const actor = getCurrentActor_();
   const temporaryUserKey = actor && actor.temporaryUserKey ? String(actor.temporaryUserKey).trim() : '';
   if (!temporaryUserKey) throw new Error('UNAUTHENTICATED: browser belum punya session key. Refresh halaman lalu coba login lagi.');
@@ -104,6 +104,7 @@ function loginDefaultPasswordSession(username, password) {
   if (!normalizedUsername) throw new Error('Username wajib diisi.');
   const providedPassword = String(password || '');
   if (!providedPassword) throw new Error('Password wajib diisi.');
+  validateDefaultLoginCaptcha_(temporaryUserKey, captchaAnswer);
   const rows = getActiveUserAccessRowsForLogin_(normalizedUsername);
   if (!rows.length) throw new Error('FORBIDDEN: username belum terdaftar aktif di USER_ACCESS.');
   const configuredRows = rows.filter(function(row) {
@@ -127,8 +128,31 @@ function loginDefaultPasswordSession(username, password) {
     tenantId: matchedTenantId,
     clinicId: matchedClinicId,
     source: 'password_session',
+    captcha: 'passed',
   });
   return getDefaultAuthState();
+}
+
+function getDefaultLoginCaptcha() {
+  const actor = getCurrentActor_();
+  const temporaryUserKey = actor && actor.temporaryUserKey ? String(actor.temporaryUserKey).trim() : '';
+  if (!temporaryUserKey) throw new Error('UNAUTHENTICATED: browser belum punya session key. Refresh halaman lalu coba lagi.');
+  const left = Math.floor(Math.random() * 8) + 2;
+  const right = Math.floor(Math.random() * 8) + 2;
+  const answer = String(left + right);
+  PropertiesService.getScriptProperties().setProperty('LOGIN_CAPTCHA_' + hashBrowserSessionKey_(temporaryUserKey), sha256Hex_(answer));
+  return { ok: true, question: 'Berapa ' + left + ' + ' + right + '?' };
+}
+
+function validateDefaultLoginCaptcha_(temporaryUserKey, captchaAnswer) {
+  const key = 'LOGIN_CAPTCHA_' + hashBrowserSessionKey_(temporaryUserKey);
+  const props = PropertiesService.getScriptProperties();
+  const expectedHash = String(props.getProperty(key) || '').trim().toLowerCase();
+  props.deleteProperty(key);
+  if (!expectedHash) throw new Error('Captcha sudah kedaluwarsa. Minta captcha baru.');
+  const answer = String(captchaAnswer || '').trim();
+  if (!answer) throw new Error('Captcha wajib diisi.');
+  if (sha256Hex_(answer) !== expectedHash) throw new Error('Captcha salah. Coba lagi.');
 }
 
 function bindDefaultBrowserSession(email, code) {
